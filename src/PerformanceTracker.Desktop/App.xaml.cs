@@ -1,5 +1,4 @@
 using System.Windows;
-using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -21,6 +20,7 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        bool startMinimized = e.Args.Any(arg => string.Equals(arg, "--minimized", StringComparison.OrdinalIgnoreCase));
 
         _host = Host.CreateDefaultBuilder()
             .ConfigureAppConfiguration((_, configuration) =>
@@ -50,11 +50,11 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<IForegroundAppTracker, ForegroundWindowTracker>();
                 services.AddSingleton<ISampleRepository>(_ =>
                 {
-                    string dataDirectory = Path.Combine(
+                    string dataDirectory = System.IO.Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                         "PerformanceTracker");
 
-                    return new SqliteSampleRepository(Path.Combine(dataDirectory, "performance-tracker.db"));
+                    return new SqliteSampleRepository(System.IO.Path.Combine(dataDirectory, "performance-tracker.db"));
                 });
 
                 services.AddSingleton<MonitoringState>();
@@ -77,7 +77,10 @@ public partial class App : System.Windows.Application
             });
 
         MainWindow = mainWindow;
-        mainWindow.Show();
+        if (!startMinimized)
+        {
+            mainWindow.Show();
+        }
     }
 
     protected override async void OnExit(ExitEventArgs e)

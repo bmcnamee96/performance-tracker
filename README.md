@@ -34,7 +34,47 @@ dotnet build performance-tracker.sln
 dotnet test performance-tracker.sln
 ```
 
+Run the desktop app during development:
+
+```powershell
+dotnet run --project src\PerformanceTracker.Desktop
+```
+
 The scaffold targets `.NET 10`. `appsettings.json` is for safe defaults only. Local overrides belong in `appsettings.Development.json`, which is ignored by git.
+
+## Publish and Run as an App
+
+Publish a standalone Windows build:
+
+```powershell
+.\scripts\publish.ps1
+```
+
+If `dotnet publish` works on your machine, that produces a clickable executable at:
+
+`out\publish\PerformanceTracker.Desktop.exe`
+
+You can also use the already-built Release executable without publishing:
+
+`src\PerformanceTracker.Desktop\bin\Release\net10.0-windows10.0.19041.0\PerformanceTracker.Desktop.exe`
+
+Create shortcuts:
+
+```powershell
+.\scripts\install-shortcuts.ps1 -Desktop
+.\scripts\install-shortcuts.ps1 -Startup
+```
+
+- The desktop shortcut opens the app normally.
+- The startup shortcut launches the app with `--minimized`, so it starts in the tray when Windows boots.
+- The shortcut script uses the published `.exe` if it exists, otherwise it falls back to the Release build `.exe`.
+
+Remove shortcuts later if needed:
+
+```powershell
+.\scripts\remove-shortcuts.ps1 -Desktop
+.\scripts\remove-shortcuts.ps1 -Startup
+```
 
 ## Privacy and Local Data
 
