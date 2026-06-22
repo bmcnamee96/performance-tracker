@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a new diagnostic, UX, or telemetry capability.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the desired capability and why it belongs in this app.
+    validations:
+      required: true
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Constraints or risks
+      description: Mention overhead, privacy, Windows API, or UX concerns.
+
