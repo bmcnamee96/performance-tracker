@@ -22,68 +22,81 @@ public sealed class ThresholdEventDetector : IEventDetector
             return Array.Empty<PerformanceEvent>();
         }
 
+        DiagnosisAnalyzer.DiagnosisInsight insight = DiagnosisAnalyzer.Analyze(recentSamples, _settings);
+        if (!insight.HasSignal)
+        {
+            return Array.Empty<PerformanceEvent>();
+        }
+
         MetricSample latest = recentSamples[^1];
-        List<PerformanceEvent> events = new();
 
-        if (HasSustainedCpuPressure(recentSamples))
-        {
-            events.Add(CreateEvent(recentSamples, latest, foregroundApp, "CPU pressure"));
-        }
-        else if (latest.MemoryUsedPercent >= _settings.MemoryHighPercent)
-        {
-            events.Add(CreateEvent(recentSamples, latest, foregroundApp, "RAM pressure"));
-        }
-        else if (latest.DiskActiveTimePercent is double diskThreshold && diskThreshold >= _settings.DiskActiveHighPercent)
-        {
-            events.Add(CreateEvent(recentSamples, latest, foregroundApp, "Disk pressure"));
-        }
-
-        return events;
+        return
+        [
+            new PerformanceEvent
+            {
+                StartedAtUtc = recentSamples[0].TimestampUtc,
+                EndedAtUtc = latest.TimestampUtc,
+                Severity = insight.Severity,
+                Summary = $"{insight.Title} built up over {FormatWindow(recentSamples)} while {DescribeForegroundApp(foregroundApp)} was active: {insight.SummaryFragment}.",
+                LikelyCause = BuildLikelyCause(recentSamples, latest, insight),
+                ForegroundApp = foregroundApp,
+                TriggerSample = latest
+            }
+        ];
     }
 
-    private bool HasSustainedCpuPressure(IReadOnlyList<MetricSample> recentSamples)
-    {
-        int requiredSamples = Math.Max(
-            1,
-            (int)Math.Ceiling((double)_settings.CpuHighDurationSeconds / Math.Max(1, _settings.SampleIntervalSeconds)));
-
-        if (recentSamples.Count < requiredSamples)
-        {
-            return false;
-        }
-
-        return recentSamples
-            .TakeLast(requiredSamples)
-            .All(sample => sample.CpuUsagePercent is double cpu && cpu >= _settings.CpuHighPercent);
-    }
-
-    private PerformanceEvent CreateEvent(
+    private string BuildLikelyCause(
         IReadOnlyList<MetricSample> recentSamples,
-        MetricSample triggerSample,
-        string? foregroundApp,
-        string title)
+        MetricSample latest,
+        DiagnosisAnalyzer.DiagnosisInsight insight)
     {
-        EventSeverity severity = DetermineSeverity(triggerSample);
+        string cause = insight.LikelyCause;
+        string? fallback = _diagnosisService.DescribeLikelyCause(latest);
 
-        return new PerformanceEvent
+        if (string.IsNullOrWhiteSpace(cause) && !string.IsNullOrWhiteSpace(fallback))
         {
-            StartedAtUtc = recentSamples[0].TimestampUtc,
-            EndedAtUtc = triggerSample.TimestampUtc,
-            Severity = severity,
-            Summary = $"{title} detected while {foregroundApp ?? "the system"} was active.",
-            LikelyCause = _diagnosisService.DescribeLikelyCause(triggerSample),
-            ForegroundApp = foregroundApp,
-            TriggerSample = triggerSample
-        };
-    }
-
-    private static EventSeverity DetermineSeverity(MetricSample sample)
-    {
-        if (sample.CpuUsagePercent is >= 95 || sample.MemoryUsedPercent >= 95 || sample.DiskActiveTimePercent is >= 95)
+            cause = fallback;
+        }
+        else if (!string.IsNullOrWhiteSpace(fallback)
+            && !string.Equals(cause, fallback, StringComparison.OrdinalIgnoreCase)
+            && ShouldAppendFallback(cause))
         {
-            return EventSeverity.Critical;
+            cause = $"{cause} Latest-sample fallback: {fallback}";
         }
 
-        return EventSeverity.Warning;
+        if (HasSparseMetrics(recentSamples))
+        {
+            cause = $"{cause} Some optional metrics were unavailable in this window, so the diagnosis favors conservative cross-signal inference.";
+        }
+
+        return cause;
+    }
+
+    private static string DescribeForegroundApp(string? foregroundApp) =>
+        string.IsNullOrWhiteSpace(foregroundApp) ? "the system" : foregroundApp;
+
+    private static string FormatWindow(IReadOnlyList<MetricSample> recentSamples)
+    {
+        if (recentSamples.Count < 2)
+        {
+            return "the latest sample";
+        }
+
+        TimeSpan window = recentSamples[^1].TimestampUtc - recentSamples[0].TimestampUtc;
+        int roundedSeconds = Math.Max(1, (int)Math.Round(window.TotalSeconds));
+        return $"{roundedSeconds}s";
+    }
+
+    private static bool ShouldAppendFallback(string cause)
+    {
+        return cause.Length < 260 && !cause.Contains("fallback", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasSparseMetrics(IReadOnlyList<MetricSample> recentSamples)
+    {
+        return recentSamples.Any(sample =>
+            sample.CpuUsagePercent is null
+            || sample.DiskActiveTimePercent is null
+            || sample.NetworkReceiveKbps is null && sample.NetworkSendKbps is null);
     }
 }

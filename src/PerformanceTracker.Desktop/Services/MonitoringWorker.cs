@@ -69,21 +69,19 @@ public sealed partial class MonitoringWorker : BackgroundService
         TrimWindow(sample.TimestampUtc);
 
         IReadOnlyList<PerformanceEvent> detectedEvents = _eventDetector.Evaluate(_recentSamples.ToArray(), foregroundApp);
-        PerformanceEvent? persistedEvent = null;
+        PerformanceEvent? latestDetectedEvent = detectedEvents.Count > 0 ? detectedEvents[^1] : null;
 
-        if (detectedEvents.Count > 0)
+        if (latestDetectedEvent is not null)
         {
-            PerformanceEvent latestEvent = detectedEvents[^1];
             if (_lastPersistedEventAtUtc is null ||
-                latestEvent.EndedAtUtc - _lastPersistedEventAtUtc >= TimeSpan.FromSeconds(_collectorSettings.EventCooldownSeconds))
+                latestDetectedEvent.EndedAtUtc - _lastPersistedEventAtUtc >= TimeSpan.FromSeconds(_collectorSettings.EventCooldownSeconds))
             {
-                await _sampleRepository.SavePerformanceEventAsync(latestEvent, cancellationToken);
-                _lastPersistedEventAtUtc = latestEvent.EndedAtUtc;
-                persistedEvent = latestEvent;
+                await _sampleRepository.SavePerformanceEventAsync(latestDetectedEvent, cancellationToken);
+                _lastPersistedEventAtUtc = latestDetectedEvent.EndedAtUtc;
             }
         }
 
-        _monitoringState.Update(sample, persistedEvent, foregroundApp);
+        _monitoringState.Update(sample, latestDetectedEvent, foregroundApp);
         LogCapturedTelemetrySample(_logger, sample.TimestampUtc);
     }
 
