@@ -30,7 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\performance-tracker.ico" />
+    <Resource Include="Assets\performance-tracker.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
     <Resource Include="Assets\performance-tracker-icon.png" />
   </ItemGroup>
 </Project>

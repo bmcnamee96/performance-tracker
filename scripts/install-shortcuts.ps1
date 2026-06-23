@@ -7,6 +7,26 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Resolve-DesktopDirectory {
+    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    if (-not [string]::IsNullOrWhiteSpace($desktopPath) -and (Test-Path $desktopPath)) {
+        return $desktopPath
+    }
+
+    $fallbacks = @(
+        (Join-Path $env:USERPROFILE "OneDrive\\Desktop"),
+        (Join-Path $env:USERPROFILE "Desktop")
+    )
+
+    foreach ($fallbackPath in $fallbacks) {
+        if (-not [string]::IsNullOrWhiteSpace($fallbackPath) -and (Test-Path $fallbackPath)) {
+            return $fallbackPath
+        }
+    }
+
+    throw "Unable to resolve the Desktop folder path."
+}
+
 $resolvedPublishDir = if ([System.IO.Path]::IsPathRooted($PublishDir)) {
     [System.IO.Path]::GetFullPath($PublishDir)
 }
@@ -48,10 +68,18 @@ function New-PerformanceTrackerShortcut {
         [string]$Arguments
     )
 
+    $outputIconPath = Join-Path $workingDirectory "performance-tracker.ico"
+    $sourceIconPath = Join-Path $PSScriptRoot "..\\src\\PerformanceTracker.Desktop\\Assets\\performance-tracker.ico"
+    $resolvedSourceIconPath = [System.IO.Path]::GetFullPath($sourceIconPath)
+    $iconLocation =
+        if (Test-Path $outputIconPath) { $outputIconPath }
+        elseif (Test-Path $resolvedSourceIconPath) { $resolvedSourceIconPath }
+        else { "$exePath,0" }
+
     $shortcut = $shell.CreateShortcut($ShortcutPath)
     $shortcut.TargetPath = $exePath
     $shortcut.WorkingDirectory = $workingDirectory
-    $shortcut.IconLocation = $exePath
+    $shortcut.IconLocation = $iconLocation
     $shortcut.Arguments = $Arguments
     $shortcut.Save()
 }
@@ -63,7 +91,7 @@ if ($Startup) {
 }
 
 if ($Desktop) {
-    $desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "Performance Tracker.lnk"
+    $desktopShortcut = Join-Path (Resolve-DesktopDirectory) "Performance Tracker.lnk"
     New-PerformanceTrackerShortcut -ShortcutPath $desktopShortcut -Arguments ""
     Write-Host "Created desktop shortcut: $desktopShortcut"
 }

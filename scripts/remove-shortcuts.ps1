@@ -5,6 +5,26 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Resolve-DesktopDirectory {
+    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    if (-not [string]::IsNullOrWhiteSpace($desktopPath) -and (Test-Path $desktopPath)) {
+        return $desktopPath
+    }
+
+    $fallbacks = @(
+        (Join-Path $env:USERPROFILE "OneDrive\\Desktop"),
+        (Join-Path $env:USERPROFILE "Desktop")
+    )
+
+    foreach ($fallbackPath in $fallbacks) {
+        if (-not [string]::IsNullOrWhiteSpace($fallbackPath) -and (Test-Path $fallbackPath)) {
+            return $fallbackPath
+        }
+    }
+
+    throw "Unable to resolve the Desktop folder path."
+}
+
 if (-not $Startup -and -not $Desktop) {
     throw "Choose at least one target to remove: -Startup and/or -Desktop."
 }
@@ -18,10 +38,9 @@ if ($Startup) {
 }
 
 if ($Desktop) {
-    $desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "Performance Tracker.lnk"
+    $desktopShortcut = Join-Path (Resolve-DesktopDirectory) "Performance Tracker.lnk"
     if (Test-Path $desktopShortcut) {
         Remove-Item -LiteralPath $desktopShortcut -Force
         Write-Host "Removed desktop shortcut: $desktopShortcut"
     }
 }
-
