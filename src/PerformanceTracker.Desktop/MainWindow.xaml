@@ -6,13 +6,24 @@
         Height="760"
         MinWidth="980"
         MinHeight="620"
-        Background="#F3F5F7"
+        Icon="Assets/performance-tracker.ico"
+        Background="#EEF5FB"
         WindowStartupLocation="CenterScreen">
   <Window.Resources>
-    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFFFF" />
-    <SolidColorBrush x:Key="CardBorderBrush" Color="#D8DEE4" />
-    <SolidColorBrush x:Key="MutedForegroundBrush" Color="#5B6675" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#EEF2F6" />
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FCFEFF" />
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#CAD9E6" />
+    <SolidColorBrush x:Key="MutedForegroundBrush" Color="#4C6379" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#EFF8FD" />
+    <SolidColorBrush x:Key="AccentPrimaryBrush" Color="#19E6FF" />
+    <SolidColorBrush x:Key="AccentSecondaryBrush" Color="#90F76E" />
+    <SolidColorBrush x:Key="AccentDarkBrush" Color="#072641" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#DDF6FF" />
+
+    <LinearGradientBrush x:Key="ShellHeaderBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Offset="0" Color="#0B2F4D" />
+      <GradientStop Offset="0.55" Color="#06233D" />
+      <GradientStop Offset="1" Color="#071A2E" />
+    </LinearGradientBrush>
 
     <Style x:Key="CardBorderStyle" TargetType="Border">
       <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
@@ -25,7 +36,7 @@
     <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
       <Setter Property="FontSize" Value="18" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="#101828" />
+      <Setter Property="Foreground" Value="{StaticResource AccentDarkBrush}" />
     </Style>
 
     <Style x:Key="MutedTextStyle" TargetType="TextBlock">
@@ -92,41 +103,62 @@
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <Grid Margin="0,0,0,16">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="Auto" />
-      </Grid.ColumnDefinitions>
+    <Border Margin="0,0,0,16"
+            Padding="22"
+            Background="{StaticResource ShellHeaderBrush}"
+            BorderBrush="#13496C"
+            BorderThickness="1"
+            CornerRadius="26">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
 
-      <StackPanel>
-        <TextBlock FontSize="28"
-                   FontWeight="SemiBold"
-                   Foreground="#101828"
-                   Text="Performance Tracker" />
-        <TextBlock Margin="0,6,0,0"
-                   Foreground="{StaticResource MutedForegroundBrush}"
-                   Text="Live desktop telemetry, recent diagnoses, and local monitoring configuration." />
-      </StackPanel>
+        <StackPanel Orientation="Horizontal">
+          <Border Width="72"
+                  Height="72"
+                  CornerRadius="18"
+                  Background="#0A2035"
+                  BorderBrush="#1B5A82"
+                  BorderThickness="1"
+                  Padding="8">
+            <Image Source="Assets/performance-tracker-icon.png"
+                   Stretch="Uniform" />
+          </Border>
 
-      <Border Grid.Column="1"
-              Padding="14,10"
-              Background="#FFFFFF"
-              BorderBrush="{StaticResource CardBorderBrush}"
-              BorderThickness="1"
-              CornerRadius="12">
-        <StackPanel>
-          <TextBlock FontSize="12"
-                     FontWeight="SemiBold"
-                     Foreground="#475467"
-                     Text="Session" />
-          <TextBlock x:Name="SessionHealthText"
-                     Margin="0,4,0,0"
-                     FontSize="14"
-                     Foreground="#101828"
-                     Text="Starting..." />
+          <StackPanel Margin="18,0,0,0"
+                      VerticalAlignment="Center">
+            <TextBlock FontSize="30"
+                       FontWeight="SemiBold"
+                       Foreground="White"
+                       Text="Performance Tracker" />
+            <TextBlock Margin="0,6,0,0"
+                       Foreground="#B8D8ED"
+                       Text="Live desktop telemetry, recent diagnoses, and local monitoring configuration." />
+          </StackPanel>
         </StackPanel>
-      </Border>
-    </Grid>
+
+        <Border Grid.Column="1"
+                Padding="16,12"
+                Background="#122B43"
+                BorderBrush="#1F658E"
+                BorderThickness="1"
+                CornerRadius="14">
+          <StackPanel>
+            <TextBlock FontSize="12"
+                       FontWeight="SemiBold"
+                       Foreground="#B8D8ED"
+                       Text="Session" />
+            <TextBlock x:Name="SessionHealthText"
+                       Margin="0,4,0,0"
+                       FontSize="14"
+                       Foreground="White"
+                       Text="Starting..." />
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Border>
 
     <TabControl Grid.Row="1">
       <TabItem Header="Dashboard">
