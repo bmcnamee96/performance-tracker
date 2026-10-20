@@ -78,7 +78,7 @@ public partial class MainWindow : Window
         var snapshot = _monitoringState.GetSnapshot();
         SessionHealthText.Text = BuildSessionHealthText(snapshot);
         SessionStatsText.Text = $"Session length: {FormatDuration(DateTimeOffset.UtcNow - snapshot.SessionStartedAtUtc)}";
-        MonitoringCadenceText.Text = $"Sampling every {_collectorSettings.SampleIntervalSeconds}s, retaining up to {snapshot.RecentSamples.Count} recent samples in memory.";
+        MonitoringCadenceText.Text = $"Sampling every {_collectorSettings.SampleIntervalSeconds}s. In-memory window: {snapshot.RecentSamples.Count} samples.";
         EventRateText.Text = snapshot.RecentEvents.Count == 0
             ? "Events this session: none yet."
             : $"Events this session: {snapshot.RecentEvents.Count} (latest {FormatRelativeAge(snapshot.RecentEvents[^1].EndedAtUtc)}).";
@@ -113,7 +113,7 @@ public partial class MainWindow : Window
             : $"Top process: {latestSample.TopProcessName} using {FormatMegabytes(latestSample.TopProcessMemoryMb)}.";
         TimelineHintText.Text = recentEvents.Length == 0
             ? "No event detections yet in this session."
-            : $"Showing the {Math.Min(4, recentEvents.Length)} most recent detections below. Open Event Timeline for the full in-session history.";
+            : $"Dashboard shows the latest {Math.Min(2, recentEvents.Length)} detections. Open Event Timeline for the full session history.";
 
         CoverageText.Text = BuildCoverageSummary(latestSample);
         OptionalMetricsText.Text = BuildOptionalTelemetrySummary(latestSample);
@@ -154,10 +154,10 @@ public partial class MainWindow : Window
         TopProcessText.Text = "Top process: waiting for first sample.";
         TimelineHintText.Text = "The timeline tab keeps an in-session history once detections start arriving.";
         CoverageText.Text = "Telemetry coverage will be summarized once the collector produces its first sample.";
-        OptionalMetricsText.Text = "Additional GPU or gaming telemetry will appear here automatically when those optional fields are present.";
+        OptionalMetricsText.Text = "Optional GPU and gaming metrics will appear here automatically when available.";
         LatestEventSeverityText.Text = "No event";
         LastEventText.Text = "No events detected yet.";
-        LastEventCauseText.Text = "Event summaries and likely causes will appear here after the first detection.";
+        LastEventCauseText.Text = "Event summaries and likely causes will appear here.";
         LatestEventMetaText.Text = $"Session active for {FormatDuration(DateTimeOffset.UtcNow - snapshot.SessionStartedAtUtc)}.";
         TriggerMetricsText.Text = "Trigger metrics: unavailable until the first sample is collected.";
         TimelineSummaryText.Text = "No session events yet.";
@@ -173,29 +173,29 @@ public partial class MainWindow : Window
         {
             LatestEventSeverityText.Text = "No event";
             LatestEventSeverityText.Foreground = InfoEventBrush;
-            LastEventText.Text = "No event detections have been recorded in this session.";
+            LastEventText.Text = "No event detections recorded in this session.";
             LastEventCauseText.Text = "When a detector fires, its summary and likely cause will appear here.";
-            LatestEventMetaText.Text = $"Current foreground app: {snapshot.ForegroundApp ?? "unavailable"}.";
-            TriggerMetricsText.Text = $"Current metrics: {BuildTriggerMetricSummary(latestSample)}";
+            LatestEventMetaText.Text = ClampText($"Foreground app: {snapshot.ForegroundApp ?? "unavailable"}.", 88);
+            TriggerMetricsText.Text = ClampText($"Current metrics: {BuildTriggerMetricSummary(latestSample)}", 110);
             return;
         }
 
         LatestEventSeverityText.Text = $"{latestEvent.Severity} event";
         LatestEventSeverityText.Foreground = GetSeverityBrush(latestEvent.Severity);
-        LastEventText.Text = latestEvent.Summary;
-        LastEventCauseText.Text = string.IsNullOrWhiteSpace(latestEvent.LikelyCause)
+        LastEventText.Text = ClampText(latestEvent.Summary, 96);
+        LastEventCauseText.Text = ClampText(string.IsNullOrWhiteSpace(latestEvent.LikelyCause)
             ? "No likely cause was provided for this event."
-            : latestEvent.LikelyCause;
-        LatestEventMetaText.Text =
+            : latestEvent.LikelyCause, 132);
+        LatestEventMetaText.Text = ClampText(
             $"{FormatTimestamp(latestEvent.EndedAtUtc)} ({FormatRelativeAge(latestEvent.EndedAtUtc)})"
-            + $" - foreground app: {latestEvent.ForegroundApp ?? snapshot.ForegroundApp ?? "unavailable"}.";
-        TriggerMetricsText.Text = $"Trigger metrics: {BuildTriggerMetricSummary(latestEvent.TriggerSample)}";
+            + $" - foreground app: {latestEvent.ForegroundApp ?? snapshot.ForegroundApp ?? "unavailable"}.", 116);
+        TriggerMetricsText.Text = ClampText($"Trigger metrics: {BuildTriggerMetricSummary(latestEvent.TriggerSample)}", 116);
     }
 
     private void UpdateTimeline(MonitoringSnapshot snapshot, PerformanceEvent[] recentEvents)
     {
         DashboardTimelineList.ItemsSource = recentEvents
-            .Take(4)
+            .Take(2)
             .Select(CreateTimelineItem)
             .ToArray();
 
@@ -214,9 +214,7 @@ public partial class MainWindow : Window
         double? peak = GetMax(recentSamples.Select(sample => sample.CpuUsagePercent));
         double? average = GetAverage(recentSamples.Select(sample => sample.CpuUsagePercent));
 
-        return $"Current {FormatPercent(latestSample.CpuUsagePercent)}"
-            + $", average {FormatPercent(average)}"
-            + $", peak {FormatPercent(peak)}.";
+        return $"{FormatPercent(latestSample.CpuUsagePercent)} now, {FormatPercent(average)} avg, {FormatPercent(peak)} peak.";
     }
 
     private static string BuildMemorySummary(MetricSample latestSample, IReadOnlyList<MetricSample> recentSamples)
@@ -225,15 +223,15 @@ public partial class MainWindow : Window
             ? latestSample.MemoryUsedPercent
             : recentSamples.Max(sample => sample.MemoryUsedPercent);
 
-        return $"{latestSample.MemoryUsedPercent:F1}% used, {latestSample.AvailableMemoryMb} MB free, {peak:F1}% peak in the recent window.";
+        return $"{latestSample.MemoryUsedPercent:F1}% used, {latestSample.AvailableMemoryMb} MB free, {peak:F1}% peak.";
     }
 
     private static string BuildDiskSummary(MetricSample latestSample, IReadOnlyList<MetricSample> recentSamples)
     {
         double? peak = GetMax(recentSamples.Select(sample => sample.DiskActiveTimePercent));
         return latestSample.DiskActiveTimePercent is null
-            ? "Disk activity telemetry is not available from the current collector."
-            : $"Current {latestSample.DiskActiveTimePercent:F1}% active time, peak {FormatPercent(peak)} in the recent window.";
+            ? "Disk activity telemetry is unavailable."
+            : $"{latestSample.DiskActiveTimePercent:F1}% active now, {FormatPercent(peak)} peak.";
     }
 
     private static string BuildNetworkSummary(MetricSample latestSample, IReadOnlyList<MetricSample> recentSamples)
@@ -243,18 +241,18 @@ public partial class MainWindow : Window
 
         if (latestSample.NetworkReceiveKbps is null && latestSample.NetworkSendKbps is null)
         {
-            return "Network telemetry is not available from the current collector.";
+            return "Network telemetry is unavailable.";
         }
 
         return $"{FormatRate(latestSample.NetworkReceiveKbps)} down, {FormatRate(latestSample.NetworkSendKbps)} up. "
-            + $"Recent peaks: {FormatRate(peakReceive)} down, {FormatRate(peakSend)} up.";
+            + $"Peaks: {FormatRate(peakReceive)} down, {FormatRate(peakSend)} up.";
     }
 
     private static string BuildTrendSummary(IReadOnlyList<MetricSample> recentSamples)
     {
         if (recentSamples.Count == 0)
         {
-            return "No recent samples are available yet.";
+            return "No recent samples yet.";
         }
 
         MetricSample oldestSample = recentSamples[0];
@@ -278,8 +276,8 @@ public partial class MainWindow : Window
             peaks.Add($"download {networkPeak:F0} Kbps");
         }
 
-        return $"Window covers {recentSamples.Count} samples from {FormatTimestamp(oldestSample.TimestampUtc)} to {FormatTimestamp(latestSample.TimestampUtc)}. "
-            + $"Recent high-water marks: {string.Join(", ", peaks)}.";
+        return $"{recentSamples.Count} samples from {FormatTimestamp(oldestSample.TimestampUtc)} to {FormatTimestamp(latestSample.TimestampUtc)}. "
+            + $"High-water marks: {string.Join(", ", peaks)}.";
     }
 
     private static string BuildCoverageSummary(MetricSample latestSample)
@@ -296,10 +294,10 @@ public partial class MainWindow : Window
         AddCoverage(latestSample.NetworkReceiveKbps is not null || latestSample.NetworkSendKbps is not null, "network", available, missing);
         AddCoverage(!string.IsNullOrWhiteSpace(latestSample.TopProcessName), "top process", available, missing);
 
-        string availableText = $"Available now: {string.Join(", ", available)}.";
+        string availableText = $"Available: {string.Join(", ", available)}.";
         return missing.Count == 0
-            ? availableText + " No expected desktop telemetry feeds are currently missing."
-            : availableText + $" Waiting on: {string.Join(", ", missing)}.";
+            ? availableText + " Missing: none."
+            : availableText + $" Missing: {string.Join(", ", missing)}.";
     }
 
     private static string BuildOptionalTelemetrySummary(MetricSample latestSample)
@@ -315,8 +313,8 @@ public partial class MainWindow : Window
         AddOptionalMetric(optionalMetrics, latestSample, "CPU temperature", " C", "CpuTemperatureC");
 
         return optionalMetrics.Count == 0
-            ? "Additional GPU or gaming telemetry is not present in the current sample contract. This panel will populate automatically when optional fields land."
-            : $"Optional telemetry detected: {string.Join(" | ", optionalMetrics)}.";
+            ? "Optional GPU and gaming telemetry is not present in the current sample."
+            : $"Optional telemetry: {string.Join(", ", optionalMetrics)}.";
     }
 
     private static TimelineEventItem CreateTimelineItem(PerformanceEvent performanceEvent)
@@ -456,6 +454,16 @@ public partial class MainWindow : Window
     private static string FormatMegabytes(double? value) => value is null ? "unknown MB" : $"{value:F1} MB";
 
     private static string FormatRate(double? value) => value is null ? "unavailable" : $"{value:F0} Kbps";
+
+    private static string ClampText(string? text, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Length <= maxLength)
+        {
+            return text ?? string.Empty;
+        }
+
+        return text[..(maxLength - 3)].TrimEnd() + "...";
+    }
 
     private static string FormatRelativeAge(DateTimeOffset timestampUtc)
     {

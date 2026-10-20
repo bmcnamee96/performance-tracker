@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Performance Tracker"
         Width="1180"
-        Height="760"
+        Height="800"
         MinWidth="980"
-        MinHeight="620"
+        MinHeight="680"
         Icon="Assets/performance-tracker.ico"
         Background="#EEF5FB"
         WindowStartupLocation="CenterScreen">
@@ -31,6 +31,12 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="14" />
       <Setter Property="Padding" Value="16" />
+    </Style>
+
+    <Style x:Key="DashboardCardBorderStyle"
+           TargetType="Border"
+           BasedOn="{StaticResource CardBorderStyle}">
+      <Setter Property="Padding" Value="14" />
     </Style>
 
     <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
@@ -95,20 +101,62 @@
         </Grid>
       </Border>
     </DataTemplate>
+
+    <DataTemplate x:Key="DashboardTimelineItemTemplate">
+      <Border Margin="0,0,0,8"
+              Padding="10"
+              Background="{StaticResource SurfaceBrush}"
+              BorderBrush="{StaticResource CardBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="10">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <StackPanel>
+            <TextBlock FontWeight="SemiBold"
+                       Foreground="#101828"
+                       Text="{Binding Summary}"
+                       TextTrimming="CharacterEllipsis" />
+            <TextBlock Margin="0,4,0,0"
+                       Foreground="#475467"
+                       Text="{Binding Cause}"
+                       TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1"
+                      Margin="12,0,0,0"
+                      HorizontalAlignment="Right">
+            <TextBlock HorizontalAlignment="Right"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Foreground="#475467"
+                       Text="{Binding SeverityText}" />
+            <TextBlock Margin="0,4,0,0"
+                       HorizontalAlignment="Right"
+                       FontSize="12"
+                       Foreground="#475467"
+                       Text="{Binding OccurredAtText}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </DataTemplate>
   </Window.Resources>
 
-  <Grid Margin="20">
+  <Grid Margin="16">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <Border Margin="0,0,0,16"
-            Padding="22"
+    <Border Margin="0,0,0,12"
+            Padding="18"
             Background="{StaticResource ShellHeaderBrush}"
             BorderBrush="#13496C"
             BorderThickness="1"
-            CornerRadius="26">
+            CornerRadius="22">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
@@ -116,31 +164,31 @@
         </Grid.ColumnDefinitions>
 
         <StackPanel Orientation="Horizontal">
-          <Border Width="72"
-                  Height="72"
-                  CornerRadius="18"
+          <Border Width="60"
+                  Height="60"
+                  CornerRadius="16"
                   Background="#0A2035"
                   BorderBrush="#1B5A82"
                   BorderThickness="1"
-                  Padding="8">
+                  Padding="7">
             <Image Source="Assets/performance-tracker-icon.png"
                    Stretch="Uniform" />
           </Border>
 
           <StackPanel Margin="18,0,0,0"
                       VerticalAlignment="Center">
-            <TextBlock FontSize="30"
+            <TextBlock FontSize="27"
                        FontWeight="SemiBold"
                        Foreground="White"
                        Text="Performance Tracker" />
-            <TextBlock Margin="0,6,0,0"
+            <TextBlock Margin="0,4,0,0"
                        Foreground="#B8D8ED"
                        Text="Live desktop telemetry, recent diagnoses, and local monitoring configuration." />
           </StackPanel>
         </StackPanel>
 
         <Border Grid.Column="1"
-                Padding="16,12"
+                Padding="14,10"
                 Background="#122B43"
                 BorderBrush="#1F658E"
                 BorderThickness="1"
@@ -162,23 +210,22 @@
 
     <TabControl Grid.Row="1">
       <TabItem Header="Dashboard">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-          <Grid Margin="12">
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <Grid Margin="12">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+
+          <Grid Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Row="0"
-                    Grid.Column="0"
-                    Margin="0,0,12,12"
-                    Style="{StaticResource CardBorderStyle}">
+            <Border Grid.Column="0"
+                    Margin="0,0,12,0"
+                    Style="{StaticResource DashboardCardBorderStyle}">
               <StackPanel>
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Monitoring Status" />
                 <TextBlock x:Name="StatusText"
@@ -197,10 +244,9 @@
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="0"
-                    Grid.Column="1"
-                    Margin="0,0,12,12"
-                    Style="{StaticResource CardBorderStyle}">
+            <Border Grid.Column="1"
+                    Margin="0,0,12,0"
+                    Style="{StaticResource DashboardCardBorderStyle}">
               <StackPanel>
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Activity Snapshot" />
                 <TextBlock x:Name="ForegroundAppText"
@@ -218,10 +264,8 @@
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="0"
-                    Grid.Column="2"
-                    Margin="0,0,0,12"
-                    Style="{StaticResource CardBorderStyle}">
+            <Border Grid.Column="2"
+                    Style="{StaticResource DashboardCardBorderStyle}">
               <StackPanel>
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Session Overview" />
                 <TextBlock x:Name="SessionStatsText"
@@ -238,26 +282,32 @@
                            Text="Events: --" />
               </StackPanel>
             </Border>
+          </Grid>
 
-            <Border Grid.Row="1"
-                    Grid.Column="0"
-                    Grid.ColumnSpan="2"
-                    Margin="0,0,12,12"
-                    Style="{StaticResource CardBorderStyle}">
+          <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="1*" />
+              <ColumnDefinition Width="0.9*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Margin="0,0,12,0"
+                    Style="{StaticResource DashboardCardBorderStyle}">
               <Grid>
                 <Grid.RowDefinitions>
                   <RowDefinition Height="Auto" />
                   <RowDefinition Height="Auto" />
-                  <RowDefinition Height="*" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Resource Overview" />
                 <TextBlock Grid.Row="1"
-                           Margin="0,6,0,0"
+                           Margin="0,4,0,0"
                            Style="{StaticResource MutedTextStyle}"
-                           Text="Current readings plus recent-window context from this desktop session." />
+                           Text="Current values with short-session context." />
 
-                <Grid Grid.Row="2" Margin="0,16,0,0">
+                <Grid Grid.Row="2" Margin="0,12,0,0">
                   <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -268,161 +318,131 @@
                     <ColumnDefinition Width="*" />
                   </Grid.ColumnDefinitions>
 
-                  <Border Grid.Row="0"
-                          Grid.Column="0"
-                          Margin="0,0,8,8"
-                          Padding="12"
-                          Background="{StaticResource SurfaceBrush}"
-                          CornerRadius="10">
-                    <StackPanel>
-                      <TextBlock FontWeight="SemiBold" Text="CPU" />
-                      <TextBlock x:Name="CpuText"
-                                 Margin="0,6,0,0"
-                                 Foreground="#344054"
-                                 TextWrapping="Wrap"
-                                 Text="--" />
-                    </StackPanel>
-                  </Border>
+                  <StackPanel Grid.Row="0"
+                              Grid.Column="0"
+                              Margin="0,0,12,10">
+                    <TextBlock FontWeight="SemiBold" Text="CPU" />
+                    <TextBlock x:Name="CpuText"
+                               Margin="0,4,0,0"
+                               Foreground="#344054"
+                               TextWrapping="Wrap"
+                               Text="--" />
+                  </StackPanel>
 
-                  <Border Grid.Row="0"
-                          Grid.Column="1"
-                          Margin="8,0,0,8"
-                          Padding="12"
-                          Background="{StaticResource SurfaceBrush}"
-                          CornerRadius="10">
-                    <StackPanel>
-                      <TextBlock FontWeight="SemiBold" Text="Memory" />
-                      <TextBlock x:Name="MemoryText"
-                                 Margin="0,6,0,0"
-                                 Foreground="#344054"
-                                 TextWrapping="Wrap"
-                                 Text="--" />
-                    </StackPanel>
-                  </Border>
+                  <StackPanel Grid.Row="0"
+                              Grid.Column="1"
+                              Margin="12,0,0,10">
+                    <TextBlock FontWeight="SemiBold" Text="Memory" />
+                    <TextBlock x:Name="MemoryText"
+                               Margin="0,4,0,0"
+                               Foreground="#344054"
+                               TextWrapping="Wrap"
+                               Text="--" />
+                  </StackPanel>
 
-                  <Border Grid.Row="1"
-                          Grid.Column="0"
-                          Margin="0,0,8,8"
-                          Padding="12"
-                          Background="{StaticResource SurfaceBrush}"
-                          CornerRadius="10">
-                    <StackPanel>
-                      <TextBlock FontWeight="SemiBold" Text="Disk" />
-                      <TextBlock x:Name="DiskText"
-                                 Margin="0,6,0,0"
-                                 Foreground="#344054"
-                                 TextWrapping="Wrap"
-                                 Text="--" />
-                    </StackPanel>
-                  </Border>
+                  <StackPanel Grid.Row="1"
+                              Grid.Column="0"
+                              Margin="0,0,12,10">
+                    <TextBlock FontWeight="SemiBold" Text="Disk" />
+                    <TextBlock x:Name="DiskText"
+                               Margin="0,4,0,0"
+                               Foreground="#344054"
+                               TextWrapping="Wrap"
+                               Text="--" />
+                  </StackPanel>
 
-                  <Border Grid.Row="1"
-                          Grid.Column="1"
-                          Margin="8,0,0,8"
-                          Padding="12"
-                          Background="{StaticResource SurfaceBrush}"
-                          CornerRadius="10">
-                    <StackPanel>
-                      <TextBlock FontWeight="SemiBold" Text="Network" />
-                      <TextBlock x:Name="NetworkText"
-                                 Margin="0,6,0,0"
-                                 Foreground="#344054"
-                                 TextWrapping="Wrap"
-                                 Text="--" />
-                    </StackPanel>
-                  </Border>
+                  <StackPanel Grid.Row="1"
+                              Grid.Column="1"
+                              Margin="12,0,0,10">
+                    <TextBlock FontWeight="SemiBold" Text="Network" />
+                    <TextBlock x:Name="NetworkText"
+                               Margin="0,4,0,0"
+                               Foreground="#344054"
+                               TextWrapping="Wrap"
+                               Text="--" />
+                  </StackPanel>
 
-                  <Border Grid.Row="2"
-                          Grid.ColumnSpan="2"
-                          Padding="12"
-                          Background="{StaticResource SurfaceBrush}"
-                          CornerRadius="10">
-                    <StackPanel>
-                      <TextBlock FontWeight="SemiBold" Text="Trend Summary" />
-                      <TextBlock x:Name="SampleTrendText"
-                                 Margin="0,6,0,0"
-                                 Foreground="#344054"
-                                 TextWrapping="Wrap"
-                                 Text="--" />
-                    </StackPanel>
-                  </Border>
+                  <StackPanel Grid.Row="2"
+                              Grid.Column="0"
+                              Margin="0,0,12,0">
+                    <TextBlock FontWeight="SemiBold" Text="Trend" />
+                    <TextBlock x:Name="SampleTrendText"
+                               Margin="0,4,0,0"
+                               Foreground="#344054"
+                               TextWrapping="Wrap"
+                               Text="--" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Row="2"
+                              Grid.Column="1"
+                              Margin="12,0,0,0">
+                    <TextBlock FontWeight="SemiBold" Text="Coverage" />
+                    <TextBlock x:Name="CoverageText"
+                               Margin="0,4,0,0"
+                               Foreground="#344054"
+                               TextWrapping="Wrap"
+                               Text="Coverage summary pending." />
+                  </StackPanel>
                 </Grid>
-              </Grid>
-            </Border>
 
-            <Border Grid.Row="1"
-                    Grid.Column="2"
-                    Margin="0,0,0,12"
-                    Style="{StaticResource CardBorderStyle}">
-              <StackPanel>
-                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Event Focus" />
-                <TextBlock x:Name="LatestEventSeverityText"
+                <TextBlock Grid.Row="3"
+                           x:Name="OptionalMetricsText"
                            Margin="0,12,0,0"
-                           FontWeight="SemiBold"
-                           Foreground="#7A271A"
-                           Text="No event" />
-                <TextBlock x:Name="LastEventText"
-                           Margin="0,6,0,0"
-                           FontSize="16"
-                           Foreground="#101828"
-                           TextWrapping="Wrap"
-                           Text="No events detected yet." />
-                <TextBlock x:Name="LastEventCauseText"
-                           Margin="0,10,0,0"
-                           Style="{StaticResource MutedTextStyle}"
-                           Text="Likely cause details will appear here." />
-                <TextBlock x:Name="LatestEventMetaText"
-                           Margin="0,10,0,0"
-                           Style="{StaticResource MutedTextStyle}"
-                           Text="Timeline metadata unavailable." />
-                <TextBlock x:Name="TriggerMetricsText"
-                           Margin="0,10,0,0"
-                           Foreground="#344054"
-                           TextWrapping="Wrap"
-                           Text="Trigger metrics: --" />
-              </StackPanel>
-            </Border>
-
-            <Border Grid.Row="2"
-                    Grid.Column="0"
-                    Grid.ColumnSpan="2"
-                    Margin="0,0,12,0"
-                    Style="{StaticResource CardBorderStyle}">
-              <StackPanel>
-                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Telemetry Coverage" />
-                <TextBlock x:Name="CoverageText"
-                           Margin="0,12,0,0"
-                           Foreground="#101828"
-                           TextWrapping="Wrap"
-                           Text="Coverage summary pending." />
-                <TextBlock x:Name="OptionalMetricsText"
-                           Margin="0,10,0,0"
                            Style="{StaticResource MutedTextStyle}"
                            Text="Additional GPU or gaming telemetry will appear here automatically when those optional fields are present." />
-              </StackPanel>
-            </Border>
-
-            <Border Grid.Row="2"
-                    Grid.Column="2"
-                    Style="{StaticResource CardBorderStyle}">
-              <Grid>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Recent Events" />
-
-                <ScrollViewer Grid.Row="1"
-                              Margin="0,12,0,0"
-                              VerticalScrollBarVisibility="Auto">
-                  <ItemsControl x:Name="DashboardTimelineList"
-                                ItemTemplate="{StaticResource TimelineItemTemplate}" />
-                </ScrollViewer>
               </Grid>
             </Border>
+
+            <Grid Grid.Column="1">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+
+              <Border Grid.Row="0"
+                      Margin="0,0,0,12"
+                      Style="{StaticResource DashboardCardBorderStyle}">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Event Focus" />
+                  <TextBlock x:Name="LatestEventSeverityText"
+                             Margin="0,10,0,0"
+                             FontWeight="SemiBold"
+                             Foreground="#7A271A"
+                             Text="No event" />
+                  <TextBlock x:Name="LastEventText"
+                             Margin="0,6,0,0"
+                             FontSize="15"
+                             Foreground="#101828"
+                             TextWrapping="Wrap"
+                             Text="No events detected yet." />
+                  <TextBlock x:Name="LastEventCauseText"
+                             Margin="0,8,0,0"
+                             Style="{StaticResource MutedTextStyle}"
+                             Text="Likely cause details will appear here." />
+                  <TextBlock x:Name="LatestEventMetaText"
+                             Margin="0,8,0,0"
+                             Style="{StaticResource MutedTextStyle}"
+                             Text="Timeline metadata unavailable." />
+                  <TextBlock x:Name="TriggerMetricsText"
+                             Margin="0,8,0,0"
+                             Foreground="#344054"
+                             TextWrapping="Wrap"
+                             Text="Trigger metrics: --" />
+                </StackPanel>
+              </Border>
+
+              <Border Grid.Row="1"
+                      Style="{StaticResource DashboardCardBorderStyle}">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Recent Events" />
+                  <ItemsControl x:Name="DashboardTimelineList"
+                                Margin="0,10,0,0"
+                                ItemTemplate="{StaticResource DashboardTimelineItemTemplate}" />
+                </StackPanel>
+              </Border>
+            </Grid>
           </Grid>
-        </ScrollViewer>
+        </Grid>
       </TabItem>
 
       <TabItem Header="Event Timeline">
