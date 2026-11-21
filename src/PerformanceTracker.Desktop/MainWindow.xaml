@@ -445,6 +445,8 @@
         </Grid>
       </TabItem>
 
+      <TabItem x:Name="AppsTab" Header="Apps &amp; Memory" />
+
       <TabItem Header="Event Timeline">
         <Grid Margin="12">
           <Grid.RowDefinitions>

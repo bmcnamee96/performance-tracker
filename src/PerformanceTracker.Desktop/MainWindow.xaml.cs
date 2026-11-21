@@ -29,9 +29,11 @@ public partial class MainWindow : Window
     public MainWindow(
         MonitoringState monitoringState,
         IOptions<CollectorSettings> collectorSettings,
-        IOptions<RetentionSettings> retentionSettings)
+        IOptions<RetentionSettings> retentionSettings,
+        AppsView appsView)
     {
         InitializeComponent();
+        AppsTab.Content = appsView;
 
         _monitoringState = monitoringState;
         _collectorSettings = collectorSettings.Value;

@@ -57,6 +57,12 @@ public partial class App : System.Windows.Application
                     return new SqliteSampleRepository(System.IO.Path.Combine(dataDirectory, "performance-tracker.db"));
                 });
 
+                services.AddSingleton<IProcessInventory, WindowsProcessInventory>();
+                services.AddSingleton<IProcessTerminator, WindowsProcessTerminator>();
+                services.AddSingleton<ProcessOverviewService>();
+                services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<ProcessOverviewService>());
+                services.AddSingleton<AppsView>();
+
                 services.AddSingleton<MonitoringState>();
                 services.AddSingleton<TrayIconService>();
                 services.AddHostedService<MonitoringWorker>();
