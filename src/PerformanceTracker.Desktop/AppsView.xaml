@@ -82,6 +82,40 @@
       </Setter>
     </Style>
 
+    <Style x:Key="ProcessActionMenuStyle" TargetType="ContextMenu">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ContextMenu">
+            <Border Background="#162636" BorderBrush="#36516A" BorderThickness="1" Padding="3">
+              <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ProcessActionMenuItemStyle" TargetType="MenuItem">
+      <Setter Property="Foreground" Value="#E6EEF5" />
+      <Setter Property="MinWidth" Value="165" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="MenuItem">
+            <Border x:Name="ItemBackground" Background="Transparent" Padding="12,7">
+              <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="ItemBackground" Property="Background" Value="#25415B" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="#8EA3B8" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
     <DataTemplate x:Key="ProcessRowTemplate">
       <Border Padding="12,7" BorderBrush="#22364A" BorderThickness="0,0,0,1" Background="#162636">
         <Grid>
@@ -90,7 +124,7 @@
             <ColumnDefinition Width="105" />
             <ColumnDefinition Width="90" />
             <ColumnDefinition Width="126" />
-            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
           <StackPanel Margin="0,0,10,0">
             <TextBlock FontWeight="SemiBold" Foreground="#E6EEF5" Text="{Binding DisplayName}" />
@@ -99,10 +133,23 @@
           <TextBlock Grid.Column="1" VerticalAlignment="Center" Foreground="#E6EEF5" Text="{Binding MemoryText}" ToolTip="{Binding MemoryTooltip}" />
           <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{Binding CpuText}" Foreground="#8EA3B8" />
           <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" ToolTip="{Binding StatusReason}" />
-          <Button Grid.Column="4" Style="{StaticResource EndButtonStyle}" Content="{Binding EndButtonText}" IsEnabled="{Binding CanEnd}"
-                  ToolTip="{Binding EndButtonToolTip}" ToolTipService.ShowOnDisabled="True" Click="OnEndClicked" />
+          <StackPanel Grid.Column="4" Orientation="Horizontal">
+            <Button Margin="0,0,5,0" Style="{StaticResource EndButtonStyle}" Content="Resume"
+                    Visibility="{Binding ResumeVisibility}" Click="OnResumeClicked" />
+            <Button Margin="0,0,5,0" Style="{StaticResource EndButtonStyle}" Content="More actions"
+                    IsEnabled="{Binding CanUseActions}" Click="OnMoreActionsClicked" />
+            <Button Style="{StaticResource EndButtonStyle}" Content="{Binding EndButtonText}" IsEnabled="{Binding CanEnd}"
+                    ToolTip="{Binding EndButtonToolTip}" ToolTipService.ShowOnDisabled="True" Click="OnEndClicked" />
+          </StackPanel>
         </Grid>
       </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ExpandedProcessTemplate">
+      <StackPanel>
+        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ProcessRowTemplate}" />
+        <ItemsControl Margin="18,0,0,0" ItemsSource="{Binding Processes}" ItemTemplate="{StaticResource ProcessRowTemplate}" />
+      </StackPanel>
     </DataTemplate>
 
     <DataTemplate x:Key="AppRowTemplate">
@@ -138,6 +185,7 @@
               <StackPanel Grid.Column="1" TextElement.Foreground="White" Margin="0,0,10,0" VerticalAlignment="Center">
                 <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#E6EEF5" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
                 <TextBlock FontSize="11" Foreground="#8EA3B8" Text="{Binding CountText}" />
+                <TextBlock FontSize="11" Foreground="#8EA3B8" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
               </StackPanel>
               <StackPanel Grid.Column="2" Margin="0,0,14,0" VerticalAlignment="Center">
                 <TextBlock FontWeight="SemiBold" Foreground="#E6EEF5" Text="{Binding MemoryText}" ToolTip="{Binding MemoryTooltip}" />
@@ -160,6 +208,10 @@
             <DockPanel LastChildFill="True" Margin="0,0,0,8">
               <Button DockPanel.Dock="Right" Margin="10,0,0,0" Style="{StaticResource EndButtonStyle}" Content="End app"
                       IsEnabled="{Binding CanEnd}" ToolTip="{Binding EndButtonToolTip}" ToolTipService.ShowOnDisabled="True" Click="OnEndClicked" />
+              <Button DockPanel.Dock="Right" Margin="5,0,0,0" Style="{StaticResource EndButtonStyle}" Content="More actions"
+                      IsEnabled="{Binding CanUseActions}" Click="OnMoreActionsClicked" />
+              <Button DockPanel.Dock="Right" Margin="5,0,0,0" Style="{StaticResource EndButtonStyle}" Content="Resume"
+                      Visibility="{Binding ResumeVisibility}" Click="OnResumeClicked" />
               <TextBlock VerticalAlignment="Center" Foreground="#8EA3B8" Text="{Binding Explanation}" TextWrapping="Wrap" />
             </DockPanel>
             <Border Background="#162636" BorderBrush="#24384C" BorderThickness="1" CornerRadius="6"
@@ -237,7 +289,7 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
             </StackPanel>
-            <ItemsControl ItemsSource="{Binding Processes}" ItemTemplate="{StaticResource ProcessRowTemplate}" />
+            <ItemsControl ItemsSource="{Binding Processes}" ItemTemplate="{StaticResource ExpandedProcessTemplate}" />
           </StackPanel>
         </Expander>
       </Border>

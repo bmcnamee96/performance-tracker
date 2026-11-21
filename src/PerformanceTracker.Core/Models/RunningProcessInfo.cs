@@ -37,5 +37,13 @@ public sealed record RunningProcessInfo
 
     public string? CommandLine { get; init; }
 
+    public int ParentId { get; init; }
+
+    public string? WorkingDirectory { get; init; }
+
+    public string? ParentDescription { get; init; }
+
+    public IReadOnlyList<string> ListeningPorts { get; init; } = [];
+
     public bool HasWindow => !string.IsNullOrWhiteSpace(WindowTitle);
 }

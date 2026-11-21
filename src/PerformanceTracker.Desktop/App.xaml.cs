@@ -62,6 +62,9 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<IProcessInventory, WindowsProcessInventory>();
                 services.AddSingleton<IProcessTerminator, WindowsProcessTerminator>();
                 services.AddSingleton<ProcessOverviewService>();
+                services.AddSingleton(_ => new ProcessActionsService(System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "PerformanceTracker", "process-actions.json")));
                 services.AddSingleton<AppsView>();
 
                 services.AddSingleton<MonitoringState>();
@@ -88,6 +91,8 @@ public partial class App : System.Windows.Application
         {
             mainWindow.Show();
         }
+
+        await _host.Services.GetRequiredService<AppsView>().OfferResumeAsync(mainWindow);
     }
 
     protected override async void OnExit(ExitEventArgs e)

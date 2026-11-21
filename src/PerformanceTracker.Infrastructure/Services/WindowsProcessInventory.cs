@@ -13,11 +13,6 @@ namespace PerformanceTracker.Infrastructure.Services;
 /// </summary>
 public sealed class WindowsProcessInventory : IProcessInventory
 {
-    private static readonly HashSet<string> CommandLineHosts = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "python", "pythonw", "node", "java", "javaw", "dotnet", "powershell", "pwsh", "bun", "deno", "ruby"
-    };
-
     private readonly object _cacheLock = new();
     private readonly Dictionary<(int, DateTimeOffset?), Details> _detailsCache = [];
     private readonly Dictionary<string, string?> _descriptionByPath = new(StringComparer.OrdinalIgnoreCase);
@@ -25,7 +20,10 @@ public sealed class WindowsProcessInventory : IProcessInventory
     public IReadOnlyList<RunningProcessInfo> Capture(bool includeDetails)
     {
         Dictionary<int, string> windowTitles = includeDetails ? ReadVisibleWindowTitles() : [];
+        DateTimeOffset portCutoff = DateTimeOffset.UtcNow;
+        var ports = includeDetails ? ProcessDetailsReader.ReadListeningPorts() : [];
         IReadOnlyList<RunningProcessInfo> processes = WindowsProcessSnapshot.Read();
+        var byId = includeDetails ? processes.ToDictionary(process => process.Id) : [];
         List<RunningProcessInfo> result = new(processes.Count);
         HashSet<(int, DateTimeOffset?)> alive = [];
 
@@ -40,6 +38,10 @@ public sealed class WindowsProcessInventory : IProcessInventory
                 ExecutablePath = details?.Path,
                 FileDescription = details?.Description,
                 CommandLine = details?.CommandLine,
+                WorkingDirectory = details?.WorkingDirectory,
+                ParentDescription = includeDetails && DevProcessRecognizer.IsHost(process.Name)
+                    ? DevProcessRecognizer.DescribeParent(process, byId) : null,
+                ListeningPorts = process.StartTimeUtc < portCutoff ? ports.GetValueOrDefault(process.Id) ?? [] : [],
                 IsProtected = details?.IsProtected ?? false
             });
         }
@@ -81,11 +83,12 @@ public sealed class WindowsProcessInventory : IProcessInventory
         bool isProtected = true;
         using (SafeFileHandle handle = OpenProcess(ProcessQueryLimitedInformation, false, (uint)id))
         {
-            if (!handle.IsInvalid)
+            if (!handle.IsInvalid && key.Item2 is DateTimeOffset expected &&
+                GetProcessTimes(handle, out long creation, out _, out _, out _) && creation == expected.ToFileTime())
             {
                 path = TryGetImagePath(handle);
                 isProtected = !IsProcessCritical(handle, out bool critical) || critical;
-                if (CommandLineHosts.Contains(name) || AppGroupBuilder.IsChromium(name.ToLowerInvariant()))
+                if (DevProcessRecognizer.IsHost(name) || AppGroupBuilder.IsChromium(name.ToLowerInvariant()))
                 {
                     commandLine = TryGetCommandLine(handle);
                 }
@@ -93,7 +96,9 @@ public sealed class WindowsProcessInventory : IProcessInventory
         }
 
         string? description = path is null ? null : GetDescription(path);
-        var details = new Details(path, description, commandLine, isProtected);
+        string? directory = DevProcessRecognizer.IsHost(name) && key.Item2 is DateTimeOffset start
+            ? ProcessDetailsReader.ReadWorkingDirectory(id, start) : null;
+        var details = new Details(path, description, commandLine, directory, isProtected);
 
         lock (_cacheLock)
         {
@@ -219,7 +224,7 @@ public sealed class WindowsProcessInventory : IProcessInventory
         }
     }
 
-    private sealed record Details(string? Path, string? Description, string? CommandLine, bool IsProtected);
+    private sealed record Details(string? Path, string? Description, string? CommandLine, string? WorkingDirectory, bool IsProtected);
 
     private const uint ProcessQueryLimitedInformation = 0x1000;
     private const uint GwOwner = 4;
@@ -259,6 +264,10 @@ public sealed class WindowsProcessInventory : IProcessInventory
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsProcessCritical(SafeFileHandle process, [MarshalAs(UnmanagedType.Bool)] out bool critical);
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetProcessTimes(SafeFileHandle process, out long creation, out long exit, out long kernel, out long user);
 
     [DllImport("ntdll.dll")]
     private static extern int NtQueryInformationProcess(SafeFileHandle process, int infoClass, nint info, int infoLength, out int returnLength);

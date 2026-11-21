@@ -16,11 +16,6 @@ public static class AppGroupBuilder
     /// <summary>How long a process must be observed before it can be called quiet.</summary>
     public static readonly TimeSpan MinimumObservation = TimeSpan.FromMinutes(1);
 
-    private static readonly HashSet<string> ScriptHosts = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "python", "pythonw", "node", "java", "javaw", "dotnet", "powershell", "pwsh", "bun", "deno", "ruby"
-    };
-
     public static IReadOnlyList<AppGroup> Build(
         IReadOnlyList<RunningProcessInfo> processes,
         IReadOnlyDictionary<int, ProcessActivity> activity,
@@ -45,8 +40,9 @@ public static class AppGroupBuilder
         RunningProcessInfo[] members,
         IReadOnlyDictionary<int, ProcessActivity> activity,
         int selfProcessId,
-        bool includeProcesses)
+        bool includeProcesses, string? subgroupKey = null)
     {
+        bool subgroup = subgroupKey is not null;
         ProcessCatalog.Entry? entry = ProcessCatalog.Lookup(key);
         bool hasWindow = members.Any(m => m.HasWindow);
         bool hasService = members.Any(m => m.SessionId == 0);
@@ -98,7 +94,7 @@ public static class AppGroupBuilder
             quietFor = null;
         }
 
-        bool suggested = safety == AppSafety.Normal && !hasWindow && !ScriptHosts.Contains(key) &&
+        bool suggested = safety == AppSafety.Normal && !hasWindow && !DevProcessRecognizer.IsHost(key) &&
                          state == AppActivity.Quiet &&
                          memory >= SuggestMinimumBytes &&
                          quietFor >= BackgroundQuietThreshold;
@@ -111,18 +107,31 @@ public static class AppGroupBuilder
 
         return new AppGroup
         {
-            Key = includeProcesses ? key : $"{members[0].Id}/{members[0].StartTimeUtc:O}",
-            DisplayName = includeProcesses ? displayName : role?.Name ?? members[0].Name,
+            Key = subgroupKey ?? (includeProcesses ? key : $"{members[0].Id}/{members[0].StartTimeUtc:O}"),
+            DisplayName = subgroup ? DescribeTool(members[0], includeProject: true)
+                : includeProcesses ? displayName
+                : role?.Name ?? (DevProcessRecognizer.IsHost(key) ? DescribeTool(members[0], includeProject: false) : members[0].Name),
             Targets = members,
             ExecutablePath = includeProcesses ? members.Select(m => m.ExecutablePath).FirstOrDefault(p => p is not null) : null,
             Processes = includeProcesses
-                ? members.OrderByDescending(m => m.MemoryBytes)
-                    .Select(m => BuildGroup(key, [m], activity, selfProcessId, includeProcesses: false)).ToArray()
+                ? subgroup || !DevProcessRecognizer.IsHost(key)
+                    ? members.OrderByDescending(m => m.MemoryBytes)
+                        .Select(m => BuildGroup(key, [m], activity, selfProcessId, includeProcesses: false)).ToArray()
+                    : members.GroupBy(m =>
+                        {
+                            var (tool, project, _) = DevProcessRecognizer.Identify(m);
+                            return (tool.ToUpperInvariant(), project?.Replace('\\', '/').ToUpperInvariant(),
+                                UnknownProjectProcess: project is null ? m.Id : 0);
+                        })
+                        .OrderByDescending(g => g.Sum(m => m.MemoryBytes))
+                        .Select(g => BuildGroup(key, g.ToArray(), activity, selfProcessId, includeProcesses: true, subgroupKey: $"tool/{key}/{g.Key}")).ToArray()
                 : [],
 
             Explanation = explanation,
-            Caution = caution,
-            Detail = role is not null ? $"Process {members[0].Id}" : DescribeDetail(key, members),
+            Caution = subgroup ? "Child processes outside this group may keep running." : caution,
+            Detail = subgroup ? $"{members.Length} {(members.Length == 1 ? "process" : "processes")}"
+                : role is not null ? $"Process {members[0].Id}"
+                : DescribeDetail(key, members, includeProcesses),
             Safety = safety,
             Activity = state,
             ProcessIds = members.Select(m => m.Id).ToArray(),
@@ -167,19 +176,46 @@ public static class AppGroupBuilder
         : hasWindow ? "App with an open window."
         : "Program running in the background with no window.";
 
-    private static string? DescribeDetail(string key, RunningProcessInfo[] members)
+    private static string DescribeTool(RunningProcessInfo process, bool includeProject)
     {
-        if (ScriptHosts.Contains(key))
-        {
-            string[] scripts = members
-                .Select(m => ExtractScript(m.CommandLine))
-                .OfType<string>()
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+        var (tool, project, _) = DevProcessRecognizer.Identify(process);
+        return includeProject && project is not null ? $"{DevProcessRecognizer.ProjectName(project)} · {tool}" : tool;
+    }
 
-            if (scripts.Length > 0)
+    private static string? DescribeDetail(string key, RunningProcessInfo[] members, bool summary)
+    {
+        if (DevProcessRecognizer.IsHost(key))
+        {
+            if (summary)
             {
-                return "Running: " + string.Join(", ", scripts.Take(3)) + (scripts.Length > 3 ? $" and {scripts.Length - 3} more" : string.Empty);
+                string[] counts = members.Select(m => DevProcessRecognizer.Identify(m).Category).OfType<string>()
+                    .GroupBy(category => category)
+                    .Select(g => $"{g.Count()} {g.Key}{(g.Count() == 1 ? "" : "s")}").ToArray();
+                if (counts.Length > 0)
+                {
+                    return string.Join(", ", counts);
+                }
+
+                string[] scripts = members.Select(m => ExtractScript(m.CommandLine)).OfType<string>()
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                if (scripts.Length > 0)
+                {
+                    return "Running: " + string.Join(", ", scripts.Take(3)) +
+                        (scripts.Length > 3 ? $" and {scripts.Length - 3} more" : string.Empty);
+                }
+            }
+            else
+            {
+                var process = members[0];
+                var (_, project, category) = DevProcessRecognizer.Identify(process);
+                return string.Join(" · ", new[]
+                {
+                    project is null ? null : $"in {DevProcessRecognizer.ProjectName(project)}",
+                    process.ParentDescription,
+                    process.ListeningPorts.Count == 0 ? null : string.Join(", ", process.ListeningPorts.Select(port =>
+                        category == "dev server" && port.StartsWith("Local TCP ", StringComparison.Ordinal)
+                            ? $"serving http://localhost:{port[10..]}" : port.Replace("Local TCP ", "TCP ", StringComparison.Ordinal)))
+                }.OfType<string>());
             }
         }
 
@@ -227,7 +263,7 @@ public static class AppGroupBuilder
         return null;
     }
 
-    private static string[] Tokenize(string commandLine)
+    internal static string[] Tokenize(string commandLine)
     {
         List<string> tokens = [];
         System.Text.StringBuilder current = new();

@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using PerformanceTracker.Core.Interfaces;
 using PerformanceTracker.Core.Models;
 using PerformanceTracker.Desktop.Services;
+using PerformanceTracker.Infrastructure.Services;
 using Button = System.Windows.Controls.Button;
 using MessageBox = System.Windows.MessageBox;
 using UserControl = System.Windows.Controls.UserControl;
@@ -23,6 +24,10 @@ public partial class AppsView : UserControl
 
     private readonly ProcessOverviewService _overview;
     private readonly IProcessTerminator _terminator;
+    private readonly IProcessInventory _inventory;
+    private readonly ProcessActionsService _actions;
+    private IReadOnlyList<ProcessActionState> _actionStates = [];
+    private bool _acting;
     private readonly DispatcherTimer _timer;
     private readonly ObservableCollection<AppRowViewModel> _rows = [];
     private IReadOnlyList<AppGroup> _latestGroups = [];
@@ -34,11 +39,13 @@ public partial class AppsView : UserControl
     private readonly HashSet<AppRowViewModel> _readingTabs = [];
 
 
-    public AppsView(ProcessOverviewService overview, IProcessTerminator terminator)
+    public AppsView(ProcessOverviewService overview, IProcessTerminator terminator, IProcessInventory inventory, ProcessActionsService actions)
     {
         InitializeComponent();
         _overview = overview;
         _terminator = terminator;
+        _inventory = inventory;
+        _actions = actions;
         AppList.ItemsSource = _rows;
 
         _timer = new DispatcherTimer { Interval = RefreshInterval };
@@ -69,6 +76,7 @@ public partial class AppsView : UserControl
         try
         {
             _latestGroups = await _overview.GetAppsAsync();
+            _actionStates = await Task.Run(_actions.ReadState);
             ApplyGroups(forceSort);
             await Task.WhenAll(_rows.Where(row => row.IsExpanded).Select(RefreshExpandedAsync));
 
@@ -101,8 +109,8 @@ public partial class AppsView : UserControl
         bool showWindows = ShowWindowsCheckBox.IsChecked == true;
         bool hideSmall = HideSmallCheckBox.IsChecked == true;
         AppGroup[] visible = _latestGroups
-            .Where(g => showWindows || g.Safety != AppSafety.Protected)
-            .Where(g => !hideSmall || g.MemoryBytes >= SmallAppBytes)
+            .Where(g => showWindows || g.Safety != AppSafety.Protected || g.Targets.Any(IsPaused))
+            .Where(g => !hideSmall || g.MemoryBytes >= SmallAppBytes || g.Targets.Any(IsPaused))
             .ToArray();
 
         // Re-sorting moves rows under the mouse, so only do it occasionally and never while the pointer is on the list.
@@ -125,6 +133,7 @@ public partial class AppsView : UserControl
             if (existing.TryGetValue(group.Key, out AppRowViewModel? row))
             {
                 row.Update(group, totalBytes, _overview.GetGrowth(group.Key));
+                row.UpdateActionState(_actionStates);
                 if (resort)
                 {
                     int current = _rows.IndexOf(row);
@@ -137,6 +146,7 @@ public partial class AppsView : UserControl
             else
             {
                 AppRowViewModel newRow = new(group, totalBytes) { Growth = _overview.GetGrowth(group.Key) };
+                newRow.UpdateActionState(_actionStates);
                 if (resort)
                 {
                     _rows.Insert(Math.Min(index, _rows.Count), newRow);
@@ -240,9 +250,147 @@ public partial class AppsView : UserControl
         }
     }
 
+    private ProcessActionState? Tracked(RunningProcessInfo process) =>
+        _actionStates.FirstOrDefault(state => state.Id == process.Id && state.Start == process.StartTimeUtc);
+
+    private bool IsPaused(RunningProcessInfo process) => Tracked(process)?.Paused == true;
+
+    internal async Task OfferResumeAsync(Window owner)
+    {
+        try
+        {
+            _actionStates = await Task.Run(_actions.ReadState);
+            if (!_actionStates.Any(state => state.Paused))
+            {
+                return;
+            }
+
+            RunningProcessInfo[] paused = (await Task.Run(() => _inventory.Capture(includeDetails: true)))
+                .Where(IsPaused).ToArray();
+            if (paused.Length > 0 && MessageBox.Show(owner,
+                $"{paused.Length} processes paused by Performance Tracker are still running. Resume them now? You can also resume them in Apps & Memory.",
+                "Resume paused processes?", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
+            {
+                await ApplyActionAsync(paused, ProcessAction.Resume);
+            }
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            ShowStatus("Couldn't read the list of paused processes.");
+        }
+    }
+
+    private void OnMoreActionsClicked(object sender, RoutedEventArgs e)
+    {
+        if (_acting || _busyEnding || sender is not Button { DataContext: AppRowViewModel row } button)
+        {
+            return;
+        }
+
+        var menu = new System.Windows.Controls.ContextMenu
+        {
+            PlacementTarget = button,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+            Style = (Style)FindResource("ProcessActionMenuStyle")
+        };
+
+        foreach ((ProcessAction action, string label) in new[]
+        {
+            (ProcessAction.Pause, "Pause"),
+            (ProcessAction.Resume, "Resume"),
+            (ProcessAction.Trim, "Free unused memory"),
+            (ProcessAction.LowerPriority, "Lower priority"),
+            (ProcessAction.RestorePriority, "Restore priority")
+        })
+        {
+            RunningProcessInfo[] targets = SelectTargets(row, action);
+            var item = new System.Windows.Controls.MenuItem
+            {
+                Header = label,
+                IsEnabled = targets.Length > 0,
+                Style = (Style)FindResource("ProcessActionMenuItemStyle")
+            };
+            item.Click += async (_, _) => await ApplyActionAsync(targets, action);
+            _ = menu.Items.Add(item);
+        }
+
+        button.ContextMenu = menu;
+        menu.IsOpen = true;
+    }
+
+    private RunningProcessInfo[] SelectTargets(AppRowViewModel row, ProcessAction action) => row.Group.Targets
+        .Where(process => ProcessActionsService.IsEligible(process, Environment.ProcessId))
+        .Where(process => action switch
+        {
+            ProcessAction.Pause => !IsPaused(process),
+            ProcessAction.Resume => IsPaused(process),
+            ProcessAction.LowerPriority => Tracked(process)?.OriginalPriority is null,
+            ProcessAction.RestorePriority => Tracked(process)?.OriginalPriority is not null,
+            _ => true
+        }).ToArray();
+
+    private async void OnResumeClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: AppRowViewModel row })
+        {
+            await ApplyActionAsync(SelectTargets(row, ProcessAction.Resume), ProcessAction.Resume);
+        }
+    }
+
+    private async Task ApplyActionAsync(RunningProcessInfo[] targets, ProcessAction action)
+    {
+        if (_acting || _busyEnding || targets.Length == 0)
+        {
+            return;
+        }
+
+        _acting = true;
+        try
+        {
+            string? warning = action switch
+            {
+                ProcessAction.Pause => "Paused apps stop responding. Pausing an app with network connections may break those connections.",
+                ProcessAction.Trim => "Windows moves memory this app isn't using right now out of RAM. It may come back as the app runs.",
+                _ => null
+            };
+            if (warning is not null && MessageBox.Show(Window.GetWindow(this) ?? System.Windows.Application.Current.MainWindow,
+                $"{warning} Continue with {targets.Length} process(es)?", action == ProcessAction.Pause ? "Pause" : "Free unused memory",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            ProcessActionResult[] results = await Task.Run(() => targets.Select(target => _actions.Apply(target, action)).ToArray());
+            ProcessActionResult[] succeeded = results.Where(result => result.Success).ToArray();
+            string status = action == ProcessAction.Trim && succeeded.Length > 0
+                ? $"Memory in RAM before: {AppRowViewModel.FormatBytes(succeeded.Sum(result => result.BeforeBytes))}. After: " +
+                    (succeeded.All(result => result.AfterBytes >= 0)
+                        ? AppRowViewModel.FormatBytes(succeeded.Sum(result => result.AfterBytes)) : "unavailable") + "."
+                : $"Action completed for {succeeded.Length} process(es).";
+            if (succeeded.Length < results.Length)
+            {
+                status += $" Windows blocked the action or the process was unavailable for {results.Length - succeeded.Length} process(es).";
+            }
+
+            ShowStatus(status);
+            _actionStates = await Task.Run(_actions.ReadState);
+            ApplyGroups(forceSort: false);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            ShowStatus("Couldn't update the saved process actions. Check the process status before trying again.");
+        }
+        finally
+        {
+            _acting = false;
+        }
+
+        await RefreshAsync(forceSort: false);
+    }
+
     private async void OnEndClicked(object sender, RoutedEventArgs e)
     {
-        if (_busyEnding || sender is not Button { DataContext: AppRowViewModel row } || !row.CanEnd)
+        if (_busyEnding || _acting || sender is not Button { DataContext: AppRowViewModel row } || !row.CanEnd)
         {
             return;
         }

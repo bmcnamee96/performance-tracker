@@ -59,6 +59,7 @@ internal static class WindowsProcessSnapshot
                     PrivateCommitBytes = (long)entry.PrivatePageCount,
                     TotalCpuTime = TimeSpan.FromTicks(entry.UserTime + entry.KernelTime),
                     StartTimeUtc = entry.CreateTime > 0 ? DateTimeOffset.FromFileTime(entry.CreateTime).ToUniversalTime() : null,
+                    ParentId = (int)entry.ParentId,
                     SessionId = entry.SessionId
                 });
             }

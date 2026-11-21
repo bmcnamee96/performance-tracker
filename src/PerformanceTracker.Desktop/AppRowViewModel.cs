@@ -6,6 +6,7 @@ using System.Windows.Media.Imaging;
 using System.Windows;
 using PerformanceTracker.Core.Models;
 using PerformanceTracker.Core.Services;
+using PerformanceTracker.Infrastructure.Services;
 using Point = System.Windows.Point;
 using PerformanceTracker.Desktop.Services;
 using Brush = System.Windows.Media.Brush;
@@ -27,6 +28,25 @@ public sealed class AppRowViewModel : INotifyPropertyChanged
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ImageSource?> Icons = new(StringComparer.OrdinalIgnoreCase);
     private AppGroup _group;
     private bool _isExpanded;
+    private IReadOnlyList<ProcessActionState> _actionStates = [];
+
+    public bool IsPaused => _group.Targets.Any(process => _actionStates.Any(state =>
+        state.Paused && state.Id == process.Id && state.Start == process.StartTimeUtc));
+
+    public Visibility ResumeVisibility => IsPaused ? Visibility.Visible : Visibility.Collapsed;
+
+    public bool CanUseActions => _group.Targets.Any(process => ProcessActionsService.IsEligible(process, Environment.ProcessId));
+
+    public void UpdateActionState(IReadOnlyList<ProcessActionState> states)
+    {
+        _actionStates = states;
+        foreach (AppRowViewModel process in Processes)
+        {
+            process.UpdateActionState(states);
+        }
+
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+    }
 
     public ObservableCollection<AppRowViewModel> Processes { get; } = [];
 
@@ -98,7 +118,13 @@ public sealed class AppRowViewModel : INotifyPropertyChanged
 
         foreach (AppGroup process in _group.Processes.Where(process => incoming.ContainsKey(process.Key)))
         {
-            Processes.Add(new AppRowViewModel(process, TotalMemoryBytes));
+            var row = new AppRowViewModel(process, TotalMemoryBytes) { _actionStates = _actionStates };
+            if (process.Processes.Count > 0)
+            {
+                row.IsExpanded = true;
+            }
+
+            Processes.Add(row);
         }
     }
 
@@ -216,7 +242,8 @@ public sealed class AppRowViewModel : INotifyPropertyChanged
     public string CpuText => _group.CpuPercent >= 0.1 ? $"{_group.CpuPercent:F1}% CPU" : "<0.1% CPU";
 
     public string StatusText =>
-        _group.Safety == AppSafety.Protected ? "Protected"
+        IsPaused ? "Paused"
+        : _group.Safety == AppSafety.Protected ? "Protected"
         : _group.Safety == AppSafety.Service ? "Service"
         : _group.IsSuggested ? $"Stale {FormatDuration(_group.QuietFor)}"
         : _group.Activity switch

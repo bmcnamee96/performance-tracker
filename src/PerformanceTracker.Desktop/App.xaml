@@ -31,7 +31,7 @@
                       BorderBrush="{TemplateBinding BorderBrush}"
                       BorderThickness="1"
                       CornerRadius="14">
-                <ContentPresenter ContentSource="SelectedContent" Margin="{TemplateBinding Padding}" />
+                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" Margin="{TemplateBinding Padding}" />
               </Border>
             </Grid>
           </ControlTemplate>
