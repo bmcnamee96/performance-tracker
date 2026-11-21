@@ -2,7 +2,10 @@ using System.IO;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.ComponentModel;
 using System.Windows;
+using System.Windows.Data;
+using PerformanceTracker.Core.Services;
 using PerformanceTracker.Infrastructure.Services;
 using CheckBox = System.Windows.Controls.CheckBox;
 using MessageBox = System.Windows.MessageBox;
@@ -13,6 +16,7 @@ namespace PerformanceTracker.Desktop;
 public partial class StartupAppsView : UserControl
 {
     private readonly StartupEntryReader _reader;
+    private IReadOnlyList<StartupRowViewModel> _rows = [];
     private bool _busy;
 
     public StartupAppsView(StartupEntryReader reader)
@@ -38,16 +42,17 @@ public partial class StartupAppsView : UserControl
         }
 
         _busy = true;
-        Status.Text = "Reading startup apps…";
+        Summary.Text = "Reading startup apps...";
         try
         {
-            var entries = await Task.Run(_reader.Read);
-            Entries.ItemsSource = entries;
-            Status.Text = $"{entries.Count} startup items";
+            IReadOnlyList<StartupEntry> entries = await Task.Run(_reader.Read);
+            _rows = entries.Select(entry => new StartupRowViewModel(entry)).ToArray();
+            ApplyView();
+            Status.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException or COMException or ManagementException)
         {
-            Status.Text = $"Couldn't read startup apps. {ex.Message}";
+            ShowStatus($"Couldn't read startup apps. {ex.Message}");
         }
         finally
         {
@@ -55,9 +60,42 @@ public partial class StartupAppsView : UserControl
         }
     }
 
+    private void FilterChanged(object sender, RoutedEventArgs e)
+    {
+        if (IsLoaded)
+        {
+            ApplyView();
+        }
+    }
+
+    private void ApplyView()
+    {
+        bool showBackground = ShowBackground.IsChecked == true;
+        ListCollectionView view = new(_rows.ToList())
+        {
+            Filter = item => showBackground || ((StartupRowViewModel)item).Category != StartupCategory.ServicesAndTasks
+        };
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(StartupRowViewModel.GroupTitle)));
+        view.SortDescriptions.Add(new SortDescription(nameof(StartupRowViewModel.Category), ListSortDirection.Ascending));
+        view.SortDescriptions.Add(new SortDescription(nameof(StartupRowViewModel.Name), ListSortDirection.Ascending));
+        Entries.ItemsSource = view;
+
+        StartupRowViewModel[] yours = _rows.Where(row => row.Category == StartupCategory.YourApps).ToArray();
+        int yoursOn = yours.Count(row => row.Enabled == true);
+        int hidden = _rows.Count(row => row.Category == StartupCategory.ServicesAndTasks);
+        Summary.Text = $"{yoursOn} of your {yours.Length} apps start with Windows" +
+            (showBackground ? "." : $". {hidden} background services and tasks are hidden.");
+    }
+
+    private void ShowStatus(string message)
+    {
+        Status.Text = message;
+        Status.Visibility = Visibility.Visible;
+    }
+
     private async void ToggleClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not CheckBox { DataContext: StartupEntry entry } checkBox)
+        if (sender is not CheckBox { DataContext: StartupRowViewModel { Entry: var entry } } checkBox)
         {
             return;
         }
@@ -83,7 +121,7 @@ public partial class StartupAppsView : UserControl
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException or InvalidOperationException)
         {
-            Status.Text = $"Couldn't change startup. {ex.Message}";
+            ShowStatus($"Couldn't change startup. {ex.Message}");
             return;
         }
         finally

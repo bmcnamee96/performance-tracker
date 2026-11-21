@@ -235,7 +235,7 @@ public sealed class StartupEntryReader(IProcessInventory inventory)
         var matches = runningStatus is null ? byPath[executable].ToArray() : [];
         string running = serviceProcess is not null ? $"Running · {serviceProcess.MemoryBytes / 1048576d:F1} MB (host)" :
             matches.Length > 0 ? $"Running · {matches.Sum(process => process.MemoryBytes) / 1048576d:F1} MB" :
-            runningStatus ?? (taskRunning ? "Running ? memory unavailable" : "Not seen running");
+            runningStatus ?? (taskRunning ? "Running · memory unavailable" : "Not seen running");
         entries.Add(new(info?.DisplayName ?? name, info?.Explanation ?? version?.FileDescription ?? "Starts automatically with Windows.",
             source, string.IsNullOrEmpty(executable) ? location : executable, version?.CompanyName ?? publisher ?? "Unknown",
             enabled, StartupApproval.RecommendedToKeep(executable, name), running, note, target));

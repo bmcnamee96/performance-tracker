@@ -1,55 +1,165 @@
 <UserControl x:Class="PerformanceTracker.Desktop.StartupAppsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <DockPanel Margin="16">
-    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-      <TextBlock FontSize="22" Text="Apps that start with Windows" />
-      <TextBlock Foreground="#8EA3B8" TextWrapping="Wrap"
-                 Text="Turning an app off here stops it from opening automatically. You can still open it yourself." />
-      <Button Content="Refresh" HorizontalAlignment="Left" Margin="0,8,0,0" Click="RefreshClick" />
-      <TextBlock x:Name="Status" Foreground="#8EA3B8" TextWrapping="Wrap" />
-    </StackPanel>
-    <ListBox x:Name="Entries" Background="#111E2C" BorderBrush="#24384C" Foreground="#E6EEF5"
+  <UserControl.Resources>
+    <!-- On/off switch drawn from a CheckBox. -->
+    <Style x:Key="SwitchStyle" TargetType="CheckBox">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <StackPanel Orientation="Horizontal">
+              <Border x:Name="Track" Width="40" Height="22" CornerRadius="11" Background="#24384C"
+                      BorderBrush="#2E4A63" BorderThickness="1">
+                <Ellipse x:Name="Knob" Width="16" Height="16" Margin="3,0" Fill="#8EA3B8" HorizontalAlignment="Left" />
+              </Border>
+              <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Track" Property="Background" Value="#0F4C57" />
+                <Setter TargetName="Track" Property="BorderBrush" Value="#3FD5E6" />
+                <Setter TargetName="Knob" Property="Fill" Value="#3FD5E6" />
+                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+              </Trigger>
+              <Trigger Property="IsChecked" Value="{x:Null}">
+                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Center" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45" />
+                <Setter Property="Cursor" Value="Arrow" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </UserControl.Resources>
+
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Border Margin="0,0,0,12" Padding="16" Background="#0F2438" BorderBrush="#24384C" BorderThickness="1" CornerRadius="14">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="White" Text="Apps that start with Windows" />
+          <TextBlock x:Name="Summary" Margin="0,8,0,0" FontSize="15" Foreground="White" Text="Reading startup apps..." />
+          <TextBlock Margin="0,6,0,0" Foreground="#8EA3B8" TextWrapping="Wrap"
+                     Text="Switching an app off only stops it opening by itself when Windows starts. You can still open it whenever you like, and switch it back on here or in Windows Settings." />
+          <TextBlock x:Name="Status" Margin="0,6,0,0" FontWeight="SemiBold" Foreground="#FDB022" TextWrapping="Wrap" Visibility="Collapsed" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Top">
+          <Button Content="Refresh" HorizontalAlignment="Right" Click="RefreshClick" />
+          <CheckBox x:Name="ShowBackground" Margin="0,12,0,0" Content="Show background services &amp; tasks"
+                    Checked="FilterChanged" Unchecked="FilterChanged" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <ListBox x:Name="Entries" Grid.Row="1" Background="Transparent" BorderThickness="0"
+             HorizontalContentAlignment="Stretch"
              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-             ScrollViewer.CanContentScroll="True" VirtualizingPanel.VirtualizationMode="Recycling">
+             VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+             VirtualizingPanel.ScrollUnit="Pixel">
+      <ListBox.GroupStyle>
+        <GroupStyle>
+          <GroupStyle.HeaderTemplate>
+            <DataTemplate>
+              <StackPanel Margin="4,14,0,8">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="#E6EEF5" Text="{Binding Name}" />
+                  <Border Margin="10,0,0,0" Padding="8,1" CornerRadius="9" Background="#1A2E42" VerticalAlignment="Center">
+                    <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#5CC8D8" Text="{Binding ItemCount}" />
+                  </Border>
+                </StackPanel>
+                <TextBlock Margin="0,3,0,0" Foreground="#8EA3B8" TextWrapping="Wrap" Text="{Binding Items[0].GroupDescription}" />
+              </StackPanel>
+            </DataTemplate>
+          </GroupStyle.HeaderTemplate>
+        </GroupStyle>
+      </ListBox.GroupStyle>
       <ListBox.ItemContainerStyle>
         <Style TargetType="ListBoxItem">
-          <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+          <Setter Property="Focusable" Value="False" />
+          <Setter Property="Template">
+            <Setter.Value>
+              <ControlTemplate TargetType="ListBoxItem">
+                <ContentPresenter />
+              </ControlTemplate>
+            </Setter.Value>
+          </Setter>
         </Style>
       </ListBox.ItemContainerStyle>
       <ListBox.ItemTemplate>
         <DataTemplate>
-          <Border BorderBrush="#24384C" BorderThickness="0,0,0,1" Padding="10">
-            <DockPanel>
-              <StackPanel DockPanel.Dock="Right" Width="175" Margin="12,0,0,0">
-                <CheckBox Content="Start automatically" Foreground="#E6EEF5"
-                          IsChecked="{Binding Enabled, Mode=OneWay}" IsThreeState="True"
-                          IsEnabled="{Binding CanChange}" Click="ToggleClick" />
-                <TextBlock Text="{Binding ChangeNote}" Foreground="#8EA3B8" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding Running}" Margin="0,6,0,0" TextWrapping="Wrap" />
+          <Border Margin="0,0,0,6" Padding="14,10" Background="#111E2C" BorderBrush="#24384C" BorderThickness="1" CornerRadius="12"
+                  ToolTip="{Binding LocationToolTip}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="110" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Margin="0,0,12,0">
+                <WrapPanel>
+                  <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#E6EEF5" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                  <Border Margin="8,0,0,0" Padding="7,1" CornerRadius="8" Background="#3A2A0E" VerticalAlignment="Center">
+                    <Border.Style>
+                      <Style TargetType="Border">
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Recommended}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Border.Style>
+                    <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#FDB022" Text="Recommended to keep" />
+                  </Border>
+                </WrapPanel>
+                <TextBlock Margin="0,2,0,0" Foreground="#C3D0DC" TextTrimming="CharacterEllipsis" Text="{Binding Explanation}" />
+                <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="#8EA3B8" TextTrimming="CharacterEllipsis" Text="{Binding SourceLine}" />
               </StackPanel>
-              <StackPanel>
-                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding Advice}" Foreground="#FDB022">
+
+              <Border Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Padding="9,3" CornerRadius="10">
+                <Border.Style>
+                  <Style TargetType="Border">
+                    <Setter Property="Background" Value="#1C2B3B" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                        <Setter Property="Background" Value="#102A45" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Border.Style>
+                <TextBlock FontSize="11" FontWeight="SemiBold" Text="{Binding RunningText}">
                   <TextBlock.Style>
                     <Style TargetType="TextBlock">
+                      <Setter Property="Foreground" Value="#8EA3B8" />
                       <Style.Triggers>
-                        <DataTrigger Binding="{Binding Recommended}" Value="False">
-                          <Setter Property="Visibility" Value="Collapsed" />
+                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                          <Setter Property="Foreground" Value="#53B1FD" />
                         </DataTrigger>
                       </Style.Triggers>
                     </Style>
                   </TextBlock.Style>
                 </TextBlock>
-                <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding Source}" Foreground="#8EA3B8" />
-                <TextBlock Text="{Binding Publisher}" Foreground="#8EA3B8" />
-                <TextBlock Text="{Binding Location}" Foreground="#8EA3B8" TextWrapping="Wrap" />
-              </StackPanel>
-            </DockPanel>
+              </Border>
+
+              <CheckBox Grid.Column="2" VerticalAlignment="Center" Style="{StaticResource SwitchStyle}"
+                        IsChecked="{Binding Enabled, Mode=OneWay}" IsThreeState="True" IsEnabled="{Binding CanChange}"
+                        Content="{Binding StateText}" Foreground="#E6EEF5"
+                        ToolTip="{Binding ToggleToolTip}" ToolTipService.ShowOnDisabled="True" Click="ToggleClick" />
+            </Grid>
           </Border>
         </DataTemplate>
       </ListBox.ItemTemplate>
     </ListBox>
-  </DockPanel>
+  </Grid>
 </UserControl>
