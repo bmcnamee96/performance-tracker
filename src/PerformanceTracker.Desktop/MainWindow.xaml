@@ -7,17 +7,18 @@
         MinWidth="980"
         MinHeight="680"
         Icon="Assets/performance-tracker.ico"
-        Background="#EEF5FB"
+        Background="#0A1420"
+        Foreground="#E6EEF5"
         WindowStartupLocation="CenterScreen">
   <Window.Resources>
-    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FCFEFF" />
-    <SolidColorBrush x:Key="CardBorderBrush" Color="#CAD9E6" />
-    <SolidColorBrush x:Key="MutedForegroundBrush" Color="#4C6379" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#EFF8FD" />
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#111E2C" />
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#24384C" />
+    <SolidColorBrush x:Key="MutedForegroundBrush" Color="#8EA3B8" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#162636" />
     <SolidColorBrush x:Key="AccentPrimaryBrush" Color="#19E6FF" />
     <SolidColorBrush x:Key="AccentSecondaryBrush" Color="#90F76E" />
-    <SolidColorBrush x:Key="AccentDarkBrush" Color="#072641" />
-    <SolidColorBrush x:Key="AccentSoftBrush" Color="#DDF6FF" />
+    <SolidColorBrush x:Key="AccentDarkBrush" Color="#DCEBF7" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#12303F" />
 
     <LinearGradientBrush x:Key="ShellHeaderBrush" StartPoint="0,0" EndPoint="1,1">
       <GradientStop Offset="0" Color="#0B2F4D" />
@@ -74,27 +75,27 @@
             <DockPanel>
               <TextBlock FontSize="15"
                          FontWeight="SemiBold"
-                         Foreground="#101828"
+                         Foreground="#E6EEF5"
                          Text="{Binding Summary}" />
               <TextBlock Margin="12,0,0,0"
                          HorizontalAlignment="Right"
-                         Foreground="#475467"
+                         Foreground="#A9BACB"
                          Text="{Binding SeverityText}" />
             </DockPanel>
 
             <TextBlock Margin="0,4,0,0"
-                       Foreground="#344054"
+                       Foreground="#C3D0DC"
                        TextWrapping="Wrap"
                        Text="{Binding Cause}" />
 
             <WrapPanel Margin="0,8,0,0">
               <TextBlock Margin="0,0,14,0"
-                         Foreground="#475467"
+                         Foreground="#A9BACB"
                          Text="{Binding OccurredAtText}" />
               <TextBlock Margin="0,0,14,0"
-                         Foreground="#475467"
+                         Foreground="#A9BACB"
                          Text="{Binding AppText}" />
-              <TextBlock Foreground="#475467"
+              <TextBlock Foreground="#A9BACB"
                          Text="{Binding MetricSummary}" />
             </WrapPanel>
           </StackPanel>
@@ -117,11 +118,11 @@
 
           <StackPanel>
             <TextBlock FontWeight="SemiBold"
-                       Foreground="#101828"
+                       Foreground="#E6EEF5"
                        Text="{Binding Summary}"
                        TextTrimming="CharacterEllipsis" />
             <TextBlock Margin="0,4,0,0"
-                       Foreground="#475467"
+                       Foreground="#A9BACB"
                        Text="{Binding Cause}"
                        TextTrimming="CharacterEllipsis" />
           </StackPanel>
@@ -132,12 +133,12 @@
             <TextBlock HorizontalAlignment="Right"
                        FontSize="12"
                        FontWeight="SemiBold"
-                       Foreground="#475467"
+                       Foreground="#A9BACB"
                        Text="{Binding SeverityText}" />
             <TextBlock Margin="0,4,0,0"
                        HorizontalAlignment="Right"
                        FontSize="12"
-                       Foreground="#475467"
+                       Foreground="#A9BACB"
                        Text="{Binding OccurredAtText}" />
           </StackPanel>
         </Grid>
@@ -231,7 +232,7 @@
                 <TextBlock x:Name="StatusText"
                            Margin="0,12,0,0"
                            FontSize="16"
-                           Foreground="#101828"
+                           Foreground="#E6EEF5"
                            Text="Collector starting..." />
                 <TextBlock x:Name="UptimeText"
                            Margin="0,8,0,0"
@@ -251,7 +252,7 @@
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Activity Snapshot" />
                 <TextBlock x:Name="ForegroundAppText"
                            Margin="0,12,0,0"
-                           Foreground="#101828"
+                           Foreground="#E6EEF5"
                            Text="Foreground app: --" />
                 <TextBlock x:Name="TopProcessText"
                            Margin="0,8,0,0"
@@ -270,7 +271,7 @@
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Session Overview" />
                 <TextBlock x:Name="SessionStatsText"
                            Margin="0,12,0,0"
-                           Foreground="#101828"
+                           Foreground="#E6EEF5"
                            Text="Samples: --" />
                 <TextBlock x:Name="MonitoringCadenceText"
                            Margin="0,8,0,0"
@@ -324,7 +325,7 @@
                     <TextBlock FontWeight="SemiBold" Text="CPU" />
                     <TextBlock x:Name="CpuText"
                                Margin="0,4,0,0"
-                               Foreground="#344054"
+                               Foreground="#C3D0DC"
                                TextWrapping="Wrap"
                                Text="--" />
                   </StackPanel>
@@ -335,7 +336,7 @@
                     <TextBlock FontWeight="SemiBold" Text="Memory" />
                     <TextBlock x:Name="MemoryText"
                                Margin="0,4,0,0"
-                               Foreground="#344054"
+                               Foreground="#C3D0DC"
                                TextWrapping="Wrap"
                                Text="--" />
                   </StackPanel>
@@ -346,7 +347,7 @@
                     <TextBlock FontWeight="SemiBold" Text="Disk" />
                     <TextBlock x:Name="DiskText"
                                Margin="0,4,0,0"
-                               Foreground="#344054"
+                               Foreground="#C3D0DC"
                                TextWrapping="Wrap"
                                Text="--" />
                   </StackPanel>
@@ -357,7 +358,7 @@
                     <TextBlock FontWeight="SemiBold" Text="Network" />
                     <TextBlock x:Name="NetworkText"
                                Margin="0,4,0,0"
-                               Foreground="#344054"
+                               Foreground="#C3D0DC"
                                TextWrapping="Wrap"
                                Text="--" />
                   </StackPanel>
@@ -368,7 +369,7 @@
                     <TextBlock FontWeight="SemiBold" Text="Trend" />
                     <TextBlock x:Name="SampleTrendText"
                                Margin="0,4,0,0"
-                               Foreground="#344054"
+                               Foreground="#C3D0DC"
                                TextWrapping="Wrap"
                                Text="--" />
                   </StackPanel>
@@ -379,7 +380,7 @@
                     <TextBlock FontWeight="SemiBold" Text="Coverage" />
                     <TextBlock x:Name="CoverageText"
                                Margin="0,4,0,0"
-                               Foreground="#344054"
+                               Foreground="#C3D0DC"
                                TextWrapping="Wrap"
                                Text="Coverage summary pending." />
                   </StackPanel>
@@ -407,12 +408,12 @@
                   <TextBlock x:Name="LatestEventSeverityText"
                              Margin="0,10,0,0"
                              FontWeight="SemiBold"
-                             Foreground="#7A271A"
+                             Foreground="#F97066"
                              Text="No event" />
                   <TextBlock x:Name="LastEventText"
                              Margin="0,6,0,0"
                              FontSize="15"
-                             Foreground="#101828"
+                             Foreground="#E6EEF5"
                              TextWrapping="Wrap"
                              Text="No events detected yet." />
                   <TextBlock x:Name="LastEventCauseText"
@@ -425,7 +426,7 @@
                              Text="Timeline metadata unavailable." />
                   <TextBlock x:Name="TriggerMetricsText"
                              Margin="0,8,0,0"
-                             Foreground="#344054"
+                             Foreground="#C3D0DC"
                              TextWrapping="Wrap"
                              Text="Trigger metrics: --" />
                 </StackPanel>
@@ -459,7 +460,7 @@
               <TextBlock Style="{StaticResource SectionTitleStyle}" Text="In-Session Event History" />
               <TextBlock x:Name="TimelineSummaryText"
                          Margin="0,10,0,0"
-                         Foreground="#101828"
+                         Foreground="#E6EEF5"
                          TextWrapping="Wrap"
                          Text="No session events yet." />
               <TextBlock Margin="0,8,0,0"
@@ -500,7 +501,7 @@
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Collection and Detection" />
                 <TextBlock x:Name="CollectionConfigText"
                            Margin="0,12,0,0"
-                           Foreground="#101828"
+                           Foreground="#E6EEF5"
                            TextWrapping="Wrap"
                            Text="Collection summary pending." />
                 <TextBlock x:Name="ThresholdConfigText"
@@ -521,7 +522,7 @@
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Storage and Retention" />
                 <TextBlock x:Name="RetentionConfigText"
                            Margin="0,12,0,0"
-                           Foreground="#101828"
+                           Foreground="#E6EEF5"
                            TextWrapping="Wrap"
                            Text="Retention summary pending." />
               </StackPanel>
@@ -534,7 +535,7 @@
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Local Overrides" />
                 <TextBlock x:Name="SettingsStatusText"
                            Margin="0,12,0,0"
-                           Foreground="#101828"
+                           Foreground="#E6EEF5"
                            TextWrapping="Wrap"
                            Text="Override status pending." />
                 <TextBlock x:Name="SettingsPathText"
@@ -549,7 +550,7 @@
               <StackPanel>
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="How to Tune This App" />
                 <TextBlock Margin="0,12,0,0"
-                           Foreground="#101828"
+                           Foreground="#E6EEF5"
                            TextWrapping="Wrap"
                            Text="Create or update appsettings.Development.json next to the deployed appsettings.json file when you want machine-local sampling or retention changes without editing tracked defaults." />
                 <TextBlock Margin="0,10,0,0"

@@ -15,12 +15,12 @@ namespace PerformanceTracker.Desktop;
 /// <summary>One row in the Apps tab. Updated in place so the list does not jump while you read it.</summary>
 public sealed class AppRowViewModel : INotifyPropertyChanged
 {
-    private static readonly Brush SuggestedBrush = CreateBrush("#067647");
-    private static readonly Brush SuggestedBackgroundBrush = CreateBrush("#DCFAE6");
-    private static readonly Brush BusyBrush = CreateBrush("#1570EF");
-    private static readonly Brush BusyBackgroundBrush = CreateBrush("#E0EFFF");
-    private static readonly Brush NeutralBrush = CreateBrush("#475467");
-    private static readonly Brush NeutralBackgroundBrush = CreateBrush("#EEF2F6");
+    private static readonly Brush SuggestedBrush = CreateBrush("#47CD89");
+    private static readonly Brush SuggestedBackgroundBrush = CreateBrush("#0E3B2A");
+    private static readonly Brush BusyBrush = CreateBrush("#53B1FD");
+    private static readonly Brush BusyBackgroundBrush = CreateBrush("#102A45");
+    private static readonly Brush NeutralBrush = CreateBrush("#A9BACB");
+    private static readonly Brush NeutralBackgroundBrush = CreateBrush("#1C2B3B");
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ImageSource?> Icons = new(StringComparer.OrdinalIgnoreCase);
     private AppGroup _group;

@@ -2,5 +2,135 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
-</Application>
+  <Application.Resources>
+    <!-- Dark theme for the stock controls that would otherwise render with light system chrome. -->
+    <SolidColorBrush x:Key="ThemeTextBrush" Color="#E6EEF5" />
+    <SolidColorBrush x:Key="ThemeMutedTextBrush" Color="#8EA3B8" />
+    <SolidColorBrush x:Key="ThemePanelBrush" Color="#0E1A27" />
+    <SolidColorBrush x:Key="ThemeRaisedBrush" Color="#162636" />
+    <SolidColorBrush x:Key="ThemeHoverBrush" Color="#1B3045" />
+    <SolidColorBrush x:Key="ThemeBorderBrush" Color="#24384C" />
+    <SolidColorBrush x:Key="ThemeAccentBrush" Color="#3FD5E6" />
 
+    <Style TargetType="TabControl">
+      <Setter Property="Background" Value="{StaticResource ThemePanelBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource ThemeBorderBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource ThemeTextBrush}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TabControl">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+              <TabPanel IsItemsHost="True" Margin="4,0,0,8" />
+              <Border Grid.Row="1"
+                      Background="{TemplateBinding Background}"
+                      BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="14">
+                <ContentPresenter ContentSource="SelectedContent" Margin="{TemplateBinding Padding}" />
+              </Border>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="TabItem">
+      <Setter Property="Foreground" Value="{StaticResource ThemeMutedTextBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TabItem">
+            <Border x:Name="Chip"
+                    Margin="0,0,6,0"
+                    Padding="14,7"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="1"
+                    CornerRadius="10">
+              <ContentPresenter ContentSource="Header" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chip" Property="Background" Value="{StaticResource ThemeHoverBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource ThemeTextBrush}" />
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Chip" Property="Background" Value="{StaticResource ThemeRaisedBrush}" />
+                <Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource ThemeAccentBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource ThemeTextBrush}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="ToolTip">
+      <Setter Property="Background" Value="{StaticResource ThemeRaisedBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource ThemeTextBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource ThemeBorderBrush}" />
+      <Setter Property="Padding" Value="8,5" />
+    </Style>
+
+    <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{StaticResource ThemeTextBrush}" />
+    </Style>
+
+    <!-- Slim dark scrollbars. -->
+    <Style x:Key="ScrollThumbStyle" TargetType="Thumb">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+            <Border x:Name="ThumbBody" Background="#2E4A63" CornerRadius="4" />
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ThumbBody" Property="Background" Value="#3F6382" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="ScrollBar">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Width" Value="10" />
+      <Setter Property="MinWidth" Value="10" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Track x:Name="PART_Track" IsDirectionReversed="True" Margin="2,4">
+              <Track.Thumb>
+                <Thumb Style="{StaticResource ScrollThumbStyle}" />
+              </Track.Thumb>
+            </Track>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="Orientation" Value="Horizontal">
+          <Setter Property="Width" Value="Auto" />
+          <Setter Property="MinWidth" Value="0" />
+          <Setter Property="Height" Value="10" />
+          <Setter Property="Template">
+            <Setter.Value>
+              <ControlTemplate TargetType="ScrollBar">
+                <Track x:Name="PART_Track" Margin="4,2">
+                  <Track.Thumb>
+                    <Thumb Style="{StaticResource ScrollThumbStyle}" />
+                  </Track.Thumb>
+                </Track>
+              </ControlTemplate>
+            </Setter.Value>
+          </Setter>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </Application.Resources>
+</Application>

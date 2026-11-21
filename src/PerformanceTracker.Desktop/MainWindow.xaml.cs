@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Microsoft.Extensions.Options;
 using PerformanceTracker.Core.Configuration;
@@ -16,9 +18,9 @@ namespace PerformanceTracker.Desktop;
 
 public partial class MainWindow : Window
 {
-    private static readonly Brush CriticalEventBrush = CreateBrush("#B42318");
-    private static readonly Brush WarningEventBrush = CreateBrush("#B54708");
-    private static readonly Brush InfoEventBrush = CreateBrush("#1570EF");
+    private static readonly Brush CriticalEventBrush = CreateBrush("#F97066");
+    private static readonly Brush WarningEventBrush = CreateBrush("#FDB022");
+    private static readonly Brush InfoEventBrush = CreateBrush("#53B1FD");
 
     private readonly MonitoringState _monitoringState;
     private readonly CollectorSettings _collectorSettings;
@@ -49,6 +51,19 @@ public partial class MainWindow : Window
         _refreshTimer.Tick += (_, _) => RefreshView();
         _refreshTimer.Start();
     }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+
+        // Ask Windows for a dark title bar to match the dark theme (Windows 10 20H1+ / Windows 11).
+        const int DwmwaUseImmersiveDarkMode = 20;
+        int enabled = 1;
+        _ = DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int));
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int size);
 
     public void ShowFromTray()
     {
