@@ -5,6 +5,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows;
 using PerformanceTracker.Core.Models;
+using PerformanceTracker.Core.Services;
+using Point = System.Windows.Point;
 using PerformanceTracker.Desktop.Services;
 using Brush = System.Windows.Media.Brush;
 using BrushConverter = System.Windows.Media.BrushConverter;
@@ -125,7 +127,7 @@ public sealed class AppRowViewModel : INotifyPropertyChanged
         : _group.Safety == AppSafety.Service
             ? "This background service may support other apps."
             : _group.IsSuggested
-                ? "This background app has no visible window, has been observed using little CPU for at least 10 minutes, and uses at least 200 MB of memory. It may still have work in progress."
+                ? "This background app has no visible window, has been observed using little CPU for at least 10 minutes, and uses at least 150 MB of private memory. It may still have work in progress."
                 : _group.Activity == AppActivity.Quiet
                     ? "CPU use has been low. Open windows and background work can still be in use."
                     : _group.Activity == AppActivity.Busy ? "CPU activity was detected recently." : "Waiting for reliable activity readings.";
@@ -152,6 +154,60 @@ public sealed class AppRowViewModel : INotifyPropertyChanged
     public string Explanation => _group.Explanation;
 
     public string Detail => _group.Detail ?? string.Empty;
+
+    public AppMemoryGrowth? Growth { get; set; }
+
+    public Visibility GrowthVisibility => Growth is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public DateTime NextHistoryRead { get; set; }
+
+    public Geometry? MemoryChart { get; private set; }
+
+    public string MemoryTrend { get; private set; } = "Collecting memory history.";
+
+    public void SetHistoryUnavailable()
+    {
+        MemoryTrend = "Memory history is temporarily unavailable.";
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MemoryTrend)));
+    }
+
+    public void SetHistory(IReadOnlyList<AppMemorySample> samples)
+    {
+        MemoryTrend = AppMemoryAnalysis.DescribeTrend(samples);
+        MemoryChart = null;
+        if (samples.Count >= 2)
+        {
+            long min = samples.Min(sample => sample.MemoryBytes);
+            long range = Math.Max(25 * 1024 * 1024, samples.Max(sample => sample.MemoryBytes) - min);
+            var chart = new StreamGeometry();
+            using (StreamGeometryContext context = chart.Open())
+            {
+                for (int i = 0; i < samples.Count; i++)
+                {
+                    var point = new Point(
+                        2 + (180 - (samples[^1].TimestampUtc - samples[i].TimestampUtc).TotalMinutes) / 180 * 236,
+                        39 - (double)(samples[i].MemoryBytes - min) / range * 35);
+                    if (i == 0 || samples[i].TimestampUtc - samples[i - 1].TimestampUtc > TimeSpan.FromMinutes(3))
+                    {
+                        context.BeginFigure(point, isFilled: false, isClosed: false);
+                    }
+                    else
+                    {
+                        context.LineTo(point, isStroked: true, isSmoothJoin: false);
+                    }
+                }
+            }
+
+            chart.Freeze();
+            MemoryChart = chart;
+        }
+
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+    }
+
+    public string MemoryTooltip => $"Private memory in RAM: {MemoryText}\n" +
+        $"Total in RAM (includes shared memory): {FormatBytes(_group.Targets.Sum(process => process.WorkingSetBytes))}\n" +
+        $"Private commit (in RAM or backed by the page file): {FormatBytes(_group.Targets.Sum(process => process.PrivateCommitBytes))}";
 
     public string MemoryText => FormatBytes(_group.MemoryBytes);
 
@@ -188,10 +244,11 @@ public sealed class AppRowViewModel : INotifyPropertyChanged
         ? $"End {_group.DisplayName} ({CountText}, {MemoryText}). You will be asked to confirm."
         : "Windows protection or an identity check blocks this action.";
 
-    public void Update(AppGroup group, long totalMemoryBytes)
+    public void Update(AppGroup group, long totalMemoryBytes, AppMemoryGrowth? growth = null)
     {
         _group = group;
         TotalMemoryBytes = totalMemoryBytes;
+        Growth = growth;
         if (IsExpanded)
         {
             UpdateProcesses();

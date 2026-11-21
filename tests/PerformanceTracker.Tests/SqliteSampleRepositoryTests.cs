@@ -8,6 +8,32 @@ namespace PerformanceTracker.Tests;
 public sealed class SqliteSampleRepositoryTests
 {
     [Fact]
+    public async Task StoresOneAppSamplePerMinuteAndPrunesExpiredHistory()
+    {
+        string databasePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.db");
+        var repository = new SqliteSampleRepository(databasePath);
+        try
+        {
+            await repository.EnsureCreatedAsync(CancellationToken.None);
+            DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_000);
+            AppMemorySample old = new("example", "Example", now.AddDays(-8), 123, 0, 1);
+            AppMemorySample current = old with { TimestampUtc = now, MemoryBytes = 456, CpuPercent = 2, ProcessCount = 3 };
+            repository.SaveAppMemorySamples([old, current], null);
+            await repository.EnsureCreatedAsync(CancellationToken.None);
+            repository.SaveAppMemorySamples([current with { TimestampUtc = now.AddSeconds(15), MemoryBytes = 789 }], now.AddDays(-7));
+
+            Assert.Equal(current with { MemoryBytes = 789 }, Assert.Single(repository.ReadAppMemorySamples("example", now.AddDays(-9))));
+            Assert.Empty(repository.ReadAppMemorySamples("other", now.AddDays(-9)));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            File.Delete(databasePath);
+        }
+    }
+
+
+    [Fact]
     public async Task CreatesSchemaAndPersistsRows()
     {
         string databasePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.db");

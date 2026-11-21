@@ -24,46 +24,24 @@ public sealed class WindowsProcessInventory : IProcessInventory
 
     public IReadOnlyList<RunningProcessInfo> Capture(bool includeDetails)
     {
-        Dictionary<int, string> windowTitles = ReadVisibleWindowTitles();
-        Process[] processes = Process.GetProcesses();
-        List<RunningProcessInfo> result = new(processes.Length);
+        Dictionary<int, string> windowTitles = includeDetails ? ReadVisibleWindowTitles() : [];
+        IReadOnlyList<RunningProcessInfo> processes = WindowsProcessSnapshot.Read();
+        List<RunningProcessInfo> result = new(processes.Count);
         HashSet<(int, DateTimeOffset?)> alive = [];
 
-        foreach (Process process in processes)
+        foreach (RunningProcessInfo process in processes)
         {
-            try
+            var key = (process.Id, process.StartTimeUtc);
+            alive.Add(key);
+            Details? details = includeDetails ? GetDetails(key, process.Id, process.Name) : TryGetCachedDetails(key);
+            result.Add(process with
             {
-                int id = process.Id;
-                string name = process.ProcessName;
-                DateTimeOffset? start = TryRead(() => (DateTimeOffset?)new DateTimeOffset(process.StartTime.ToUniversalTime()));
-                (int, DateTimeOffset?) key = (id, start);
-                alive.Add(key);
-
-                Details? details = includeDetails ? GetDetails(key, id, name) : TryGetCachedDetails(key);
-
-                result.Add(new RunningProcessInfo
-                {
-                    Id = id,
-                    Name = name,
-                    MemoryBytes = TryRead(() => process.WorkingSet64),
-                    TotalCpuTime = TryRead(() => (TimeSpan?)process.TotalProcessorTime),
-                    StartTimeUtc = start,
-                    SessionId = TryRead(() => process.SessionId),
-                    WindowTitle = windowTitles.GetValueOrDefault(id),
-                    ExecutablePath = details?.Path,
-                    FileDescription = details?.Description,
-                    CommandLine = details?.CommandLine,
-                    IsProtected = details?.IsProtected ?? false
-                });
-            }
-            catch
-            {
-                // The process exited while we were reading it.
-            }
-            finally
-            {
-                process.Dispose();
-            }
+                WindowTitle = windowTitles.GetValueOrDefault(process.Id),
+                ExecutablePath = details?.Path,
+                FileDescription = details?.Description,
+                CommandLine = details?.CommandLine,
+                IsProtected = details?.IsProtected ?? false
+            });
         }
 
         if (includeDetails)

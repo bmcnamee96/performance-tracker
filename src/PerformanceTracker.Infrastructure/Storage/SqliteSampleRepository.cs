@@ -4,7 +4,7 @@ using PerformanceTracker.Core.Models;
 
 namespace PerformanceTracker.Infrastructure.Storage;
 
-public sealed class SqliteSampleRepository : ISampleRepository
+public sealed partial class SqliteSampleRepository : ISampleRepository
 {
     private readonly string _databasePath;
     private static bool _sqliteInitialized;
@@ -99,6 +99,16 @@ public sealed class SqliteSampleRepository : ISampleRepository
         SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
+            CREATE TABLE IF NOT EXISTS app_memory_samples (
+              minute INTEGER NOT NULL,
+              app_key TEXT NOT NULL,
+              display_name TEXT NOT NULL,
+              memory_bytes INTEGER NOT NULL,
+              cpu_percent REAL NOT NULL,
+              process_count INTEGER NOT NULL,
+              PRIMARY KEY (minute, app_key)
+            ) WITHOUT ROWID;
+            CREATE INDEX IF NOT EXISTS ix_app_memory_key_minute ON app_memory_samples (app_key, minute);
             CREATE TABLE IF NOT EXISTS metric_samples (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               timestamp_utc TEXT NOT NULL,

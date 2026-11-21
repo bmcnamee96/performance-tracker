@@ -1,6 +1,6 @@
 namespace PerformanceTracker.Core.Models;
 
-public sealed class PerformanceEvent
+public sealed record PerformanceEvent
 {
     public DateTimeOffset StartedAtUtc { get; init; }
 
@@ -16,4 +16,3 @@ public sealed class PerformanceEvent
 
     public MetricSample TriggerSample { get; init; } = new();
 }
-

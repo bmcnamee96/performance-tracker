@@ -18,6 +18,7 @@ public sealed class WindowsProcessTerminator : IProcessTerminator
     private static async Task<EndProcessResult> EndCoreAsync(IReadOnlyList<RunningProcessInfo> snapshots, bool force, CancellationToken cancellationToken)
     {
         List<Process> targets = [];
+        Dictionary<int, long> privateMemory = [];
         int blocked = 0;
         foreach (RunningProcessInfo target in snapshots)
         {
@@ -36,6 +37,7 @@ public sealed class WindowsProcessTerminator : IProcessTerminator
                     continue;
                 }
 
+                privateMemory[process.Id] = target.MemoryBytes;
                 targets.Add(process);
                 process = null;
             }
@@ -64,7 +66,7 @@ public sealed class WindowsProcessTerminator : IProcessTerminator
             foreach (Process process in targets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                long memory = TryGetMemory(process);
+                long memory = privateMemory[process.Id];
                 if (closeWindows)
                 {
                     TryCloseWindow(process);
@@ -94,7 +96,7 @@ public sealed class WindowsProcessTerminator : IProcessTerminator
                 timeout.CancelAfter(GracefulWait);
                 foreach (Process process in waitingOnClose)
                 {
-                    long memory = TryGetMemory(process);
+                    long memory = privateMemory[process.Id];
                     try
                     {
                         await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
@@ -192,18 +194,6 @@ public sealed class WindowsProcessTerminator : IProcessTerminator
         catch
         {
             return false;
-        }
-    }
-
-    private static long TryGetMemory(Process process)
-    {
-        try
-        {
-            return process.HasExited ? 0 : process.WorkingSet64;
-        }
-        catch
-        {
-            return 0;
         }
     }
 }

@@ -1,61 +1,108 @@
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using PerformanceTracker.Core.Configuration;
 using PerformanceTracker.Core.Interfaces;
 using PerformanceTracker.Core.Models;
 using PerformanceTracker.Core.Services;
+using PerformanceTracker.Infrastructure.Storage;
 
 namespace PerformanceTracker.Desktop.Services;
 
-/// <summary>
-/// Keeps a running picture of which apps are busy or quiet. It observes cheaply in the
-/// background (so "quiet for 40 min" is meaningful when you open the Apps tab) and does a
-/// detailed capture when the UI asks.
-/// </summary>
-public sealed class ProcessOverviewService : BackgroundService
+public sealed class ProcessOverviewService(
+    IProcessInventory inventory,
+    SqliteSampleRepository repository,
+    IOptions<RetentionSettings> retention)
 {
-    private static readonly TimeSpan BackgroundInterval = TimeSpan.FromSeconds(30);
-
-    private readonly IProcessInventory _inventory;
     private readonly ProcessActivityTracker _tracker = new(Environment.ProcessorCount);
+    private readonly ProcessActivityTracker _eventTracker = new(Environment.ProcessorCount);
     private readonly object _lock = new();
+    private Dictionary<string, AppMemoryGrowth> _growth = new(StringComparer.Ordinal);
+    private AppMemorySample[] _previous = [];
+    private long _lastMinute = -1;
+    private DateTimeOffset _nextPrune;
+    private DateTimeOffset _lastActivityObservation;
 
-    public ProcessOverviewService(IProcessInventory inventory)
-    {
-        _inventory = inventory;
-    }
+    public event EventHandler<AppMemoryGrowth>? GrowthDetected;
 
-    /// <summary>Captures the current process list with details and groups it into apps.</summary>
+    public AppMemoryGrowth? GetGrowth(string key) => Volatile.Read(ref _growth).GetValueOrDefault(key);
+
+    public Task<IReadOnlyList<AppMemorySample>> ReadHistoryAsync(string key) =>
+        Task.Run(() => repository.ReadAppMemorySamples(key, DateTimeOffset.UtcNow.AddHours(-3)));
+
     public Task<IReadOnlyList<AppGroup>> GetAppsAsync() =>
         Task.Run(() =>
         {
-            IReadOnlyList<AppGroup> groups = Observe(includeDetails: true);
+            IReadOnlyList<AppGroup> groups;
+            lock (_lock)
+            {
+                IReadOnlyList<RunningProcessInfo> processes = inventory.Capture(includeDetails: true);
+                _lastActivityObservation = DateTimeOffset.UtcNow;
+                var activity = _tracker.Observe(processes, _lastActivityObservation);
+                groups = AppGroupBuilder.Build(processes, activity, Environment.ProcessId);
+            }
+
             AppRowViewModel.CacheIcons(groups);
             return groups;
         });
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public string? Observe(MetricSample sample, bool attribute)
     {
-        using PeriodicTimer timer = new(BackgroundInterval);
-        do
-        {
-            try
-            {
-                _ = Observe(includeDetails: false);
-            }
-            catch
-            {
-                // Observation is best effort; try again next tick.
-            }
-        }
-        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
-    }
-
-    private IReadOnlyList<AppGroup> Observe(bool includeDetails)
-    {
+        bool hasBaseline = _previous.Length != 0;
+        IReadOnlyDictionary<int, ProcessActivity> activity;
         lock (_lock)
         {
-            IReadOnlyList<RunningProcessInfo> processes = _inventory.Capture(includeDetails);
-            IReadOnlyDictionary<int, ProcessActivity> activity = _tracker.Observe(processes, DateTimeOffset.UtcNow);
-            return includeDetails ? AppGroupBuilder.Build(processes, activity, Environment.ProcessId) : [];
+            activity = _eventTracker.Observe(sample.Processes, sample.TimestampUtc);
+            if (sample.TimestampUtc > _lastActivityObservation && sample.Processes.Count > 0)
+            {
+                _tracker.Observe(sample.Processes, sample.TimestampUtc);
+                _lastActivityObservation = sample.TimestampUtc;
+            }
         }
+
+        AppMemorySample[] current = sample.Processes
+            .GroupBy(process => process.Name.Trim().ToLowerInvariant())
+            .Select(group => new AppMemorySample(
+                group.Key,
+                ProcessCatalog.Lookup(group.Key)?.DisplayName ?? group.First().FileDescription ?? group.First().Name,
+                sample.TimestampUtc,
+                group.Sum(process => process.MemoryBytes),
+                group.Sum(process => activity[process.Id].CpuPercent),
+                group.Count()))
+            .ToArray();
+
+        string? contributor = attribute && hasBaseline ? AppMemoryAnalysis.DescribeContributor(_previous, current) : null;
+        _previous = current;
+        long minute = sample.TimestampUtc.ToUnixTimeSeconds() / 60;
+        if (minute <= _lastMinute || current.Length == 0)
+        {
+            return contributor;
+        }
+
+        DateTimeOffset? cutoff = sample.TimestampUtc >= _nextPrune
+            ? sample.TimestampUtc.AddDays(-Math.Max(1, retention.Value.AppMemoryRetentionDays))
+            : null;
+        repository.SaveAppMemorySamples(current, cutoff);
+        if (cutoff.HasValue)
+        {
+            _nextPrune = sample.TimestampUtc.AddHours(1);
+        }
+
+        _lastMinute = minute;
+        HashSet<string> running = current.Select(app => app.Key).ToHashSet(StringComparer.Ordinal);
+        var next = repository.ReadAppMemorySamples(null, sample.TimestampUtc.AddMinutes(-60))
+            .GroupBy(point => point.Key)
+            .Where(group => running.Contains(group.Key))
+            .Select(group => AppMemoryAnalysis.DetectGrowth(group.ToArray()))
+            .OfType<AppMemoryGrowth>()
+            .ToDictionary(growth => growth.Latest.Key, StringComparer.Ordinal);
+        var previous = Interlocked.Exchange(ref _growth, next);
+        foreach (AppMemoryGrowth growth in next.Values)
+        {
+            if (!previous.ContainsKey(growth.Latest.Key))
+            {
+                GrowthDetected?.Invoke(this, growth);
+            }
+        }
+
+        return contributor;
     }
 }

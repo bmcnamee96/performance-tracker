@@ -10,8 +10,12 @@ public sealed record RunningProcessInfo
     /// <summary>Executable name without extension, e.g. "chrome".</summary>
     public required string Name { get; init; }
 
-    /// <summary>Working set in bytes.</summary>
+    /// <summary>Private working set in bytes.</summary>
     public long MemoryBytes { get; init; }
+
+    public long WorkingSetBytes { get; init; }
+
+    public long PrivateCommitBytes { get; init; }
 
     /// <summary>Total CPU time consumed since the process started, when readable.</summary>
     public TimeSpan? TotalCpuTime { get; init; }

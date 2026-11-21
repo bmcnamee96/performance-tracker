@@ -8,7 +8,7 @@ using PerformanceTracker.Core.Models;
 
 namespace PerformanceTracker.Infrastructure.Services;
 
-public sealed class WindowsPerformanceCollector : IMetricCollector
+public sealed class WindowsPerformanceCollector(IProcessInventory inventory) : IMetricCollector
 {
     private readonly ForegroundWindowTracker _foregroundWindowTracker = new();
 
@@ -19,7 +19,6 @@ public sealed class WindowsPerformanceCollector : IMetricCollector
     private double? _lastCpuUsagePercent;
 
     private MemorySnapshot _lastMemorySnapshot;
-    private ProcessSnapshot _lastTopProcessSnapshot;
 
     private NetworkSnapshot? _networkSnapshot;
     private double? _lastNetworkReceiveKbps;
@@ -36,7 +35,18 @@ public sealed class WindowsPerformanceCollector : IMetricCollector
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
         MemorySnapshot memory = ReadMemoryUsage();
-        ProcessSnapshot topProcess = ReadTopProcess(cancellationToken);
+        IReadOnlyList<RunningProcessInfo> processes;
+        try
+        {
+            processes = inventory.Capture(includeDetails: false);
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            processes = [];
+        }
+
+        RunningProcessInfo? largest = processes.MaxBy(process => process.MemoryBytes);
+        ProcessSnapshot topProcess = new(largest?.Name, largest is null ? null : Math.Round(largest.MemoryBytes / 1024d / 1024d, 1));
         DiskMetricsSnapshot diskMetrics = ReadDiskMetrics();
         (double? networkReceiveKbps, double? networkSendKbps) = ReadNetworkThroughput();
         GameContextSnapshot gameContext = ReadGameContext(topProcess);
@@ -64,6 +74,7 @@ public sealed class WindowsPerformanceCollector : IMetricCollector
             GpuDedicatedMemoryMb = null,
             GpuSharedMemoryMb = null,
             GpuTemperatureCelsius = null,
+            Processes = processes,
             TopProcessName = topProcess.Name,
             TopProcessMemoryMb = topProcess.MemoryMb,
             GameProcessName = gameContext.GameProcessName,
@@ -163,65 +174,6 @@ public sealed class WindowsPerformanceCollector : IMetricCollector
         catch
         {
             return _lastMemorySnapshot;
-        }
-    }
-
-    private ProcessSnapshot ReadTopProcess(CancellationToken cancellationToken)
-    {
-        try
-        {
-            Process[] processes = Process.GetProcesses();
-            string? topProcessName = null;
-            double? topProcessMemoryMb = null;
-            long highestWorkingSet = 0;
-
-            foreach (Process process in processes)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                try
-                {
-                    long workingSet = process.WorkingSet64;
-                    if (workingSet <= highestWorkingSet)
-                    {
-                        continue;
-                    }
-
-                    string? processName = ResolveProcessDisplayName(process);
-                    if (string.IsNullOrWhiteSpace(processName))
-                    {
-                        continue;
-                    }
-
-                    highestWorkingSet = workingSet;
-                    topProcessName = processName;
-                    topProcessMemoryMb = Math.Round(workingSet / 1024d / 1024d, 1);
-                }
-                catch
-                {
-                    // Skip protected or short-lived processes.
-                }
-                finally
-                {
-                    process.Dispose();
-                }
-            }
-
-            if (topProcessName is null)
-            {
-                return _lastTopProcessSnapshot;
-            }
-
-            _lastTopProcessSnapshot = new ProcessSnapshot(topProcessName, topProcessMemoryMb);
-            return _lastTopProcessSnapshot;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch
-        {
-            return _lastTopProcessSnapshot;
         }
     }
 
@@ -428,84 +380,6 @@ public sealed class WindowsPerformanceCollector : IMetricCollector
                networkInterface.NetworkInterfaceType is not NetworkInterfaceType.Tunnel;
     }
 
-    private static string? ResolveProcessDisplayName(Process process)
-    {
-        string? processName = TryGetProcessName(process);
-        string? windowTitle = TryGetMainWindowTitle(process);
-
-        if (string.IsNullOrWhiteSpace(processName))
-        {
-            return NormalizeWindowTitle(windowTitle);
-        }
-
-        processName = NormalizeProcessName(processName);
-        string? normalizedTitle = NormalizeWindowTitle(windowTitle);
-
-        if (normalizedTitle is not null && PrefersWindowTitle(processName))
-        {
-            return normalizedTitle;
-        }
-
-        return processName;
-    }
-
-    private static string? TryGetProcessName(Process process)
-    {
-        try
-        {
-            return process.ProcessName;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static string? TryGetMainWindowTitle(Process process)
-    {
-        try
-        {
-            return process.MainWindowTitle;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static string NormalizeProcessName(string processName)
-    {
-        string normalized = Path.GetFileNameWithoutExtension(processName).Trim();
-        return string.IsNullOrWhiteSpace(normalized) ? processName.Trim() : normalized;
-    }
-
-    private static string? NormalizeWindowTitle(string? windowTitle)
-    {
-        if (string.IsNullOrWhiteSpace(windowTitle))
-        {
-            return null;
-        }
-
-        string normalizedTitle = windowTitle.Trim();
-        foreach (string suffix in KnownLauncherSuffixes)
-        {
-            if (normalizedTitle.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-            {
-                normalizedTitle = normalizedTitle[..^suffix.Length].TrimEnd();
-                break;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(normalizedTitle) || IgnoredWindowTitles.Contains(normalizedTitle))
-        {
-            return null;
-        }
-
-        return normalizedTitle;
-    }
-
-    private static bool PrefersWindowTitle(string processName) => TitlePreferredProcesses.Contains(processName);
-
     private GameContextSnapshot ReadGameContext(ProcessSnapshot topProcess)
     {
         string? foregroundApp = _foregroundWindowTracker.GetForegroundProcessName();
@@ -582,23 +456,6 @@ public sealed class WindowsPerformanceCollector : IMetricCollector
         return $@"\\.\\{char.ToUpperInvariant(systemDrive[0])}:";
     }
 
-    private static readonly HashSet<string> TitlePreferredProcesses = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "ApplicationFrameHost",
-        "Battle.net",
-        "EADesktop",
-        "EpicGamesLauncher",
-        "explorer",
-        "GameBar",
-        "origin",
-        "RiotClientServices",
-        "RiotClientUx",
-        "RiotClientUxRender",
-        "steam",
-        "steamwebhelper",
-        "UbisoftConnect",
-        "XboxPcApp"
-    };
 
     private static readonly HashSet<string> IgnoredWindowTitles = new(StringComparer.OrdinalIgnoreCase)
     {

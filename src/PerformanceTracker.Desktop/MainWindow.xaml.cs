@@ -127,7 +127,7 @@ public partial class MainWindow : Window
         ForegroundAppText.Text = $"Foreground app: {snapshot.ForegroundApp ?? "unavailable"}";
         TopProcessText.Text = latestSample.TopProcessName is null
             ? "Top process: unavailable in current sample."
-            : $"Top process: {latestSample.TopProcessName} using {FormatMegabytes(latestSample.TopProcessMemoryMb)}.";
+            : $"Top process: {latestSample.TopProcessName} using {FormatMegabytes(latestSample.TopProcessMemoryMb)} of private memory.";
         TimelineHintText.Text = recentEvents.Length == 0
             ? "No event detections yet in this session."
             : $"Dashboard shows the latest {Math.Min(2, recentEvents.Length)} detections. Open Event Timeline for the full session history.";
@@ -148,7 +148,7 @@ public partial class MainWindow : Window
         WindowConfigText.Text =
             $"The live diagnosis window spans {_collectorSettings.EventContextWindowSeconds}s of recent samples, with a {_collectorSettings.EventCooldownSeconds}s cooldown between persisted events.";
         RetentionConfigText.Text =
-            $"Raw samples: {_retentionSettings.RawSampleRetentionHours}h. Event rows: {_retentionSettings.EventRetentionDays}d. Daily summaries: {_retentionSettings.DailySummaryRetentionDays}d.";
+            $"Raw samples: {_retentionSettings.RawSampleRetentionHours}h. Event rows: {_retentionSettings.EventRetentionDays}d. Daily summaries: {_retentionSettings.DailySummaryRetentionDays}d. App memory history: {_retentionSettings.AppMemoryRetentionDays}d.";
 
         string overridesPath = Path.Combine(AppContext.BaseDirectory, "appsettings.Development.json");
         SettingsStatusText.Text = File.Exists(overridesPath)
@@ -200,9 +200,11 @@ public partial class MainWindow : Window
         LatestEventSeverityText.Text = $"{latestEvent.Severity} event";
         LatestEventSeverityText.Foreground = GetSeverityBrush(latestEvent.Severity);
         LastEventText.Text = ClampText(latestEvent.Summary, 96);
-        LastEventCauseText.Text = ClampText(string.IsNullOrWhiteSpace(latestEvent.LikelyCause)
+        string cause = string.IsNullOrWhiteSpace(latestEvent.LikelyCause)
             ? "No likely cause was provided for this event."
-            : latestEvent.LikelyCause, 132);
+            : latestEvent.LikelyCause;
+        LastEventCauseText.Text = ClampText(cause, 175);
+        LastEventCauseText.ToolTip = cause;
         LatestEventMetaText.Text = ClampText(
             $"{FormatTimestamp(latestEvent.EndedAtUtc)} ({FormatRelativeAge(latestEvent.EndedAtUtc)})"
             + $" - foreground app: {latestEvent.ForegroundApp ?? snapshot.ForegroundApp ?? "unavailable"}.", 116);
@@ -540,4 +542,3 @@ public partial class MainWindow : Window
         string MetricSummary,
         Brush SeverityBrush);
 }
-

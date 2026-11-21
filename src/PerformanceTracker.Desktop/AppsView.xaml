@@ -96,7 +96,7 @@
             <TextBlock FontWeight="SemiBold" Foreground="#E6EEF5" Text="{Binding DisplayName}" />
             <TextBlock FontSize="11" Foreground="#8EA3B8" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}" />
           </StackPanel>
-          <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding MemoryText}" />
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" Foreground="#E6EEF5" Text="{Binding MemoryText}" ToolTip="{Binding MemoryTooltip}" />
           <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{Binding CpuText}" Foreground="#8EA3B8" />
           <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" ToolTip="{Binding StatusReason}" />
           <Button Grid.Column="4" Style="{StaticResource EndButtonStyle}" Content="{Binding EndButtonText}" IsEnabled="{Binding CanEnd}"
@@ -115,7 +115,7 @@
                 <ColumnDefinition Width="45" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="108" />
-                <ColumnDefinition Width="126" />
+                <ColumnDefinition Width="156" />
               </Grid.ColumnDefinitions>
               <Border Width="34" Height="34" CornerRadius="8" Background="#1A2E42" HorizontalAlignment="Left">
                 <Grid>
@@ -140,14 +140,20 @@
                 <TextBlock FontSize="11" Foreground="#8EA3B8" Text="{Binding CountText}" />
               </StackPanel>
               <StackPanel Grid.Column="2" Margin="0,0,14,0" VerticalAlignment="Center">
-                <TextBlock FontWeight="SemiBold" Foreground="#E6EEF5" Text="{Binding MemoryText}" />
+                <TextBlock FontWeight="SemiBold" Foreground="#E6EEF5" Text="{Binding MemoryText}" ToolTip="{Binding MemoryTooltip}" />
                 <ProgressBar ToolTip="Share of physical memory" Height="5" Margin="0,5,0,0" Maximum="1" Value="{Binding MemoryFraction, Mode=OneWay}"
                              Foreground="#3FD5E6" Background="#22364A" BorderThickness="0" />
               </StackPanel>
-              <Border Grid.Column="3" HorizontalAlignment="Left" VerticalAlignment="Center" Padding="9,4" CornerRadius="10"
-                      Background="{Binding StatusBackground}" ToolTip="{Binding StatusReason}">
-                <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{Binding StatusBrush}" Text="{Binding StatusText}" />
-              </Border>
+              <StackPanel Grid.Column="3" Orientation="Horizontal">
+                <Border HorizontalAlignment="Left" VerticalAlignment="Center" Padding="9,4" CornerRadius="10"
+                        Background="{Binding StatusBackground}" ToolTip="{Binding StatusReason}">
+                  <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{Binding StatusBrush}" Text="{Binding StatusText}" />
+                </Border>
+                <Border Margin="6,0,0,0" Padding="9,4" CornerRadius="10" Background="#44341C"
+                        Visibility="{Binding GrowthVisibility}" ToolTip="{Binding Growth.Reason}" VerticalAlignment="Center">
+                  <TextBlock Text="Growing" FontSize="11" FontWeight="SemiBold" Foreground="#FFD18A" />
+                </Border>
+              </StackPanel>
             </Grid>
           </Expander.Header>
           <StackPanel Margin="26,10,0,0">
@@ -156,6 +162,25 @@
                       IsEnabled="{Binding CanEnd}" ToolTip="{Binding EndButtonToolTip}" ToolTipService.ShowOnDisabled="True" Click="OnEndClicked" />
               <TextBlock VerticalAlignment="Center" Foreground="#8EA3B8" Text="{Binding Explanation}" TextWrapping="Wrap" />
             </DockPanel>
+            <Border Background="#162636" BorderBrush="#24384C" BorderThickness="1" CornerRadius="6"
+                    Padding="12,8" Margin="0,0,0,10">
+              <StackPanel>
+                <TextBlock Text="Private memory over the last 3 hours" Foreground="#E6EEF5" FontWeight="SemiBold" />
+                <Path Data="{Binding MemoryChart}" Stroke="#3FD5E6" StrokeThickness="2"
+                      Height="42" Width="240" HorizontalAlignment="Left" Margin="0,4,0,0">
+                  <Path.Style>
+                    <Style TargetType="Path">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding MemoryChart}" Value="{x:Null}">
+                          <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Path.Style>
+                </Path>
+                <TextBlock Text="{Binding MemoryTrend}" Foreground="#8EA3B8" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
             <TextBlock Margin="0,0,0,8" Foreground="#8EA3B8" Text="{Binding BrowserNote}" TextWrapping="Wrap" Visibility="{Binding BrowserNoteVisibility}" />
             <StackPanel Margin="0,0,0,10" Visibility="{Binding BrowserNoteVisibility}">
               <TextBlock Text="Open tabs" FontWeight="SemiBold" Foreground="#E6EEF5" Margin="0,0,0,5" />
@@ -280,7 +305,7 @@
                     Margin="0,12,0,0"
                     Foreground="White"
                     IsChecked="True"
-                    Content="Hide apps under 50 MB"
+                    Content="Hide apps under 30 MB of private memory"
                     Checked="OnFilterChanged"
                     Unchecked="OnFilterChanged" />
           <CheckBox x:Name="ShowWindowsCheckBox"

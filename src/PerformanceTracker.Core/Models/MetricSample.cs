@@ -46,6 +46,8 @@ public sealed class MetricSample
 
     public string? TopProcessName { get; init; }
 
+    public IReadOnlyList<RunningProcessInfo> Processes { get; init; } = [];
+
     public double? TopProcessMemoryMb { get; init; }
 
     public string? GameProcessName { get; init; }

@@ -13,6 +13,7 @@ public sealed partial class MonitoringWorker : BackgroundService
     private readonly IEventDetector _eventDetector;
     private readonly ISampleRepository _sampleRepository;
     private readonly IForegroundAppTracker _foregroundAppTracker;
+    private readonly ProcessOverviewService _processOverview;
     private readonly MonitoringState _monitoringState;
     private readonly ILogger<MonitoringWorker> _logger;
     private readonly CollectorSettings _collectorSettings;
@@ -25,6 +26,7 @@ public sealed partial class MonitoringWorker : BackgroundService
         ISampleRepository sampleRepository,
         IForegroundAppTracker foregroundAppTracker,
         MonitoringState monitoringState,
+        ProcessOverviewService processOverview,
         IOptions<CollectorSettings> collectorSettings,
         ILogger<MonitoringWorker> logger)
     {
@@ -32,6 +34,7 @@ public sealed partial class MonitoringWorker : BackgroundService
         _eventDetector = eventDetector;
         _sampleRepository = sampleRepository;
         _foregroundAppTracker = foregroundAppTracker;
+        _processOverview = processOverview;
         _monitoringState = monitoringState;
         _collectorSettings = collectorSettings.Value;
         _logger = logger;
@@ -71,6 +74,20 @@ public sealed partial class MonitoringWorker : BackgroundService
         IReadOnlyList<PerformanceEvent> detectedEvents = _eventDetector.Evaluate(_recentSamples.ToArray(), foregroundApp);
         PerformanceEvent? latestDetectedEvent = detectedEvents.Count > 0 ? detectedEvents[^1] : null;
 
+        string? contributor = null;
+        try
+        {
+            contributor = _processOverview.Observe(sample, latestDetectedEvent is not null);
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException exception)
+        {
+            LogHistoryUnavailable(_logger, exception);
+        }
+        if (latestDetectedEvent is not null && contributor is not null)
+        {
+            latestDetectedEvent = latestDetectedEvent with { LikelyCause = $"{contributor} {latestDetectedEvent.LikelyCause}" };
+        }
+
         if (latestDetectedEvent is not null)
         {
             if (_lastPersistedEventAtUtc is null ||
@@ -94,6 +111,9 @@ public sealed partial class MonitoringWorker : BackgroundService
             _recentSamples.Dequeue();
         }
     }
+
+    [LoggerMessage(EventId = 1001, Level = LogLevel.Warning, Message = "App memory history is temporarily unavailable.")]
+    private static partial void LogHistoryUnavailable(ILogger logger, Exception exception);
 
     [LoggerMessage(
         EventId = 1000,

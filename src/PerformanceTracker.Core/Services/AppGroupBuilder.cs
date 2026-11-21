@@ -7,8 +7,8 @@ namespace PerformanceTracker.Core.Services;
 /// </summary>
 public static class AppGroupBuilder
 {
-    /// <summary>Minimum memory for an app to be suggested for closing.</summary>
-    public const long SuggestMinimumBytes = 200L * 1024 * 1024;
+    /// <summary>Minimum private working set for an app to be suggested for closing.</summary>
+    public const long SuggestMinimumBytes = 150L * 1024 * 1024;
 
     /// <summary>How long a background app must be quiet before it is suggested.</summary>
     public static readonly TimeSpan BackgroundQuietThreshold = TimeSpan.FromMinutes(10);

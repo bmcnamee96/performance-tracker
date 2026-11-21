@@ -48,19 +48,20 @@ public partial class App : System.Windows.Application
 
                 services.AddSingleton<IMetricCollector, WindowsPerformanceCollector>();
                 services.AddSingleton<IForegroundAppTracker, ForegroundWindowTracker>();
-                services.AddSingleton<ISampleRepository>(_ =>
+                services.AddSingleton<SqliteSampleRepository>(_ =>
                 {
                     string dataDirectory = System.IO.Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                         "PerformanceTracker");
 
-                    return new SqliteSampleRepository(System.IO.Path.Combine(dataDirectory, "performance-tracker.db"));
+                    return new SqliteSampleRepository(Environment.GetEnvironmentVariable("PERFORMANCE_TRACKER_DATABASE") ??
+                        System.IO.Path.Combine(dataDirectory, "performance-tracker.db"));
                 });
 
+                services.AddSingleton<ISampleRepository>(provider => provider.GetRequiredService<SqliteSampleRepository>());
                 services.AddSingleton<IProcessInventory, WindowsProcessInventory>();
                 services.AddSingleton<IProcessTerminator, WindowsProcessTerminator>();
                 services.AddSingleton<ProcessOverviewService>();
-                services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<ProcessOverviewService>());
                 services.AddSingleton<AppsView>();
 
                 services.AddSingleton<MonitoringState>();

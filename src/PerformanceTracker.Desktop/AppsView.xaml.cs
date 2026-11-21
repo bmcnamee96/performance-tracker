@@ -17,7 +17,7 @@ namespace PerformanceTracker.Desktop;
 /// </summary>
 public partial class AppsView : UserControl
 {
-    private const long SmallAppBytes = 50L * 1024 * 1024;
+    private const long SmallAppBytes = 30L * 1024 * 1024;
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ResortInterval = TimeSpan.FromSeconds(15);
 
@@ -70,7 +70,7 @@ public partial class AppsView : UserControl
         {
             _latestGroups = await _overview.GetAppsAsync();
             ApplyGroups(forceSort);
-            await Task.WhenAll(_rows.Where(row => row.IsExpanded).Select(RefreshTabsAsync));
+            await Task.WhenAll(_rows.Where(row => row.IsExpanded).Select(RefreshExpandedAsync));
 
         }
         catch (Exception ex)
@@ -124,7 +124,7 @@ public partial class AppsView : UserControl
             AppGroup group = visible[index];
             if (existing.TryGetValue(group.Key, out AppRowViewModel? row))
             {
-                row.Update(group, totalBytes);
+                row.Update(group, totalBytes, _overview.GetGrowth(group.Key));
                 if (resort)
                 {
                     int current = _rows.IndexOf(row);
@@ -136,7 +136,7 @@ public partial class AppsView : UserControl
             }
             else
             {
-                AppRowViewModel newRow = new(group, totalBytes);
+                AppRowViewModel newRow = new(group, totalBytes) { Growth = _overview.GetGrowth(group.Key) };
                 if (resort)
                 {
                     _rows.Insert(Math.Min(index, _rows.Count), newRow);
@@ -151,6 +151,29 @@ public partial class AppsView : UserControl
         if (resort)
         {
             _lastSortUtc = DateTime.UtcNow;
+        }
+    }
+
+    private async Task RefreshExpandedAsync(AppRowViewModel row)
+    {
+        await Task.WhenAll(RefreshTabsAsync(row), RefreshHistoryAsync(row));
+    }
+
+    private async Task RefreshHistoryAsync(AppRowViewModel row)
+    {
+        if (!row.IsExpanded || DateTime.UtcNow < row.NextHistoryRead)
+        {
+            return;
+        }
+
+        row.NextHistoryRead = DateTime.UtcNow.AddMinutes(1);
+        try
+        {
+            row.SetHistory(await _overview.ReadHistoryAsync(row.Key));
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException)
+        {
+            row.SetHistoryUnavailable();
         }
     }
 
@@ -182,7 +205,7 @@ public partial class AppsView : UserControl
         if (ReferenceEquals(sender, e.OriginalSource) &&
             sender is System.Windows.Controls.Expander { DataContext: AppRowViewModel row })
         {
-            await RefreshTabsAsync(row);
+            await RefreshExpandedAsync(row);
         }
     }
 
@@ -209,7 +232,7 @@ public partial class AppsView : UserControl
                 row.NextTabRead = DateTime.MinValue;
             }
 
-            await Task.WhenAll(_rows.Where(row => row.IsExpanded).Select(RefreshTabsAsync));
+            await Task.WhenAll(_rows.Where(row => row.IsExpanded).Select(RefreshExpandedAsync));
         }
         finally
         {
