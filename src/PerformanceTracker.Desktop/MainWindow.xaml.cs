@@ -32,10 +32,12 @@ public partial class MainWindow : Window
         MonitoringState monitoringState,
         IOptions<CollectorSettings> collectorSettings,
         IOptions<RetentionSettings> retentionSettings,
-        AppsView appsView)
+        AppsView appsView, StartupAppsView startupAppsView, AlertSettingsView alertSettingsView)
     {
         InitializeComponent();
         AppsTab.Content = appsView;
+        StartupTab.Content = startupAppsView;
+        AlertsSettings.Content = alertSettingsView;
 
         _monitoringState = monitoringState;
         _collectorSettings = collectorSettings.Value;
@@ -70,6 +72,16 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+    }
+
+    public void ShowAppFromAlert(string? key)
+    {
+        ShowFromTray();
+        AppsTab.IsSelected = true;
+        if (!string.IsNullOrEmpty(key) && AppsTab.Content is AppsView apps)
+        {
+            apps.Reveal(key);
+        }
     }
 
     public void PrepareForExit()

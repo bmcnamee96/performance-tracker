@@ -66,6 +66,11 @@ public partial class App : System.Windows.Application
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "PerformanceTracker", "process-actions.json")));
                 services.AddSingleton<AppsView>();
+                services.AddSingleton<StartupEntryReader>();
+                services.AddSingleton<StartupAppsView>();
+                services.AddSingleton<UserSettingsStore>();
+                services.AddSingleton<AlertService>();
+                services.AddSingleton<AlertSettingsView>();
 
                 services.AddSingleton<MonitoringState>();
                 services.AddSingleton<TrayIconService>();
@@ -78,8 +83,11 @@ public partial class App : System.Windows.Application
 
         MainWindow mainWindow = _host.Services.GetRequiredService<MainWindow>();
         _trayIconService = _host.Services.GetRequiredService<TrayIconService>();
+        AlertService alerts = _host.Services.GetRequiredService<AlertService>();
+        alerts.Start(mainWindow.ShowAppFromAlert);
         _trayIconService.Initialize(
             () => mainWindow.ShowFromTray(),
+            alerts.Pause,
             () =>
             {
                 mainWindow.PrepareForExit();

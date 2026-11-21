@@ -449,6 +449,8 @@
 
       <TabItem x:Name="AppsTab" Header="Apps &amp; Memory" />
 
+      <TabItem x:Name="StartupTab" Header="Startup Apps" />
+
       <TabItem Header="Event Timeline">
         <Grid Margin="12">
           <Grid.RowDefinitions>
@@ -493,9 +495,12 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0"
+            <ContentControl x:Name="AlertsSettings" />
+
+            <Border Grid.Row="1"
                     Margin="0,0,0,12"
                     Style="{StaticResource CardBorderStyle}">
               <StackPanel>
@@ -516,7 +521,7 @@
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="1"
+            <Border Grid.Row="2"
                     Margin="0,0,0,12"
                     Style="{StaticResource CardBorderStyle}">
               <StackPanel>
@@ -529,7 +534,7 @@
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="2"
+            <Border Grid.Row="3"
                     Margin="0,0,0,12"
                     Style="{StaticResource CardBorderStyle}">
               <StackPanel>
@@ -546,7 +551,7 @@
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="3"
+            <Border Grid.Row="4"
                     Style="{StaticResource CardBorderStyle}">
               <StackPanel>
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="How to Tune This App" />

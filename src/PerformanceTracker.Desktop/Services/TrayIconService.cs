@@ -9,7 +9,15 @@ public sealed class TrayIconService : IDisposable
     private static readonly Uri AppIconUri = new("pack://application:,,,/Assets/performance-tracker.ico", UriKind.Absolute);
     private Forms.NotifyIcon? _notifyIcon;
 
-    public void Initialize(Action showWindow, Action exitApplication)
+    private Action? _openAlert;
+
+    public void ShowAlert(string title, string body, Action open)
+    {
+        _openAlert = open;
+        _notifyIcon?.ShowBalloonTip(5000, title, body, Forms.ToolTipIcon.Info);
+    }
+
+    public void Initialize(Action showWindow, Action pauseAlerts, Action exitApplication)
     {
         if (_notifyIcon is not null)
         {
@@ -18,6 +26,7 @@ public sealed class TrayIconService : IDisposable
 
         Forms.ContextMenuStrip menu = new();
         menu.Items.Add("Open Dashboard", null, (_, _) => showWindow());
+        menu.Items.Add("Pause alerts for 1 hour", null, (_, _) => pauseAlerts());
         menu.Items.Add("Exit", null, (_, _) => exitApplication());
 
         _notifyIcon = new Forms.NotifyIcon
@@ -28,6 +37,7 @@ public sealed class TrayIconService : IDisposable
             ContextMenuStrip = menu
         };
 
+        _notifyIcon.BalloonTipClicked += (_, _) => _openAlert?.Invoke();
         _notifyIcon.DoubleClick += (_, _) => showWindow();
     }
 

@@ -65,6 +65,16 @@ public partial class AppsView : UserControl
         };
     }
 
+    private string? _revealKey;
+    private string? _alertedAppKey;
+
+    public void Reveal(string key)
+    {
+        _revealKey = key;
+        _alertedAppKey = key;
+        _ = RefreshAsync(forceSort: true);
+    }
+
     private async Task RefreshAsync(bool forceSort)
     {
         if (_refreshing || !IsVisible)
@@ -78,6 +88,20 @@ public partial class AppsView : UserControl
             _latestGroups = await _overview.GetAppsAsync();
             _actionStates = await Task.Run(_actions.ReadState);
             ApplyGroups(forceSort);
+            if (_revealKey is { } key)
+            {
+                _revealKey = null;
+                AppRowViewModel? row = _rows.FirstOrDefault(row => row.Key == key);
+                if (row is not null)
+                {
+                    row.IsExpanded = true;
+                    AppList.ScrollIntoView(row);
+                }
+                else
+                {
+                    ShowStatus("That app is no longer running.");
+                }
+            }
             await Task.WhenAll(_rows.Where(row => row.IsExpanded).Select(RefreshExpandedAsync));
 
         }
@@ -109,8 +133,8 @@ public partial class AppsView : UserControl
         bool showWindows = ShowWindowsCheckBox.IsChecked == true;
         bool hideSmall = HideSmallCheckBox.IsChecked == true;
         AppGroup[] visible = _latestGroups
-            .Where(g => showWindows || g.Safety != AppSafety.Protected || g.Targets.Any(IsPaused))
-            .Where(g => !hideSmall || g.MemoryBytes >= SmallAppBytes || g.Targets.Any(IsPaused))
+            .Where(g => g.Key == _alertedAppKey || showWindows || g.Safety != AppSafety.Protected || g.Targets.Any(IsPaused))
+            .Where(g => g.Key == _alertedAppKey || !hideSmall || g.MemoryBytes >= SmallAppBytes || g.Targets.Any(IsPaused))
             .ToArray();
 
         // Re-sorting moves rows under the mouse, so only do it occasionally and never while the pointer is on the list.
