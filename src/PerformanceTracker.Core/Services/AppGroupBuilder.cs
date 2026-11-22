@@ -265,6 +265,13 @@ public static class AppGroupBuilder
                 return tokens[i + 1];
             }
 
+            // Preloaded helpers (node --require x.cjs, --import, --loader) aren't the program being run.
+            if (token is "-r" or "--require" or "--import" or "--loader" or "--experimental-loader")
+            {
+                i++;
+                continue;
+            }
+
             if (token.StartsWith('-'))
             {
                 continue;

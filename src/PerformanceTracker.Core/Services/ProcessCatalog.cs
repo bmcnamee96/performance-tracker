@@ -54,7 +54,7 @@ public static class ProcessCatalog
         ["smartscreen"] = new("SmartScreen", "Checks downloads and apps for malware.", AppSafety.Protected),
         ["sgrmbroker"] = new("System guard", "Windows integrity protection.", AppSafety.Protected),
         ["vmmem"] = new("Virtual machine memory", "Memory used by WSL (Linux), Docker or Hyper-V.", AppSafety.Protected, "Run `wsl --shutdown` or quit Docker Desktop to release it."),
-        ["vmmemwsl"] = new("WSL memory", "Memory used by Linux (WSL) and Docker.", AppSafety.Protected, "Run `wsl --shutdown` or quit Docker Desktop to release it."),
+        ["vmmemwsl"] = new("Linux (WSL)", "Linux running inside Windows (WSL), plus Docker if it's open. Its memory and processor use show up here.", AppSafety.Protected, "Run `wsl --shutdown` or quit Docker Desktop to release it."),
 
         // Browsers.
         ["chrome"] = new("Google Chrome", "Web browser. Tabs, extensions, and browser features use multiple processes.", AppSafety.Caution, BrowserCaution),

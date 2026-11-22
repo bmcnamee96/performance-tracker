@@ -3,6 +3,7 @@ using PerformanceTracker.Core.Configuration;
 using PerformanceTracker.Core.Interfaces;
 using PerformanceTracker.Core.Models;
 using PerformanceTracker.Core.Services;
+using PerformanceTracker.Infrastructure.Services;
 using PerformanceTracker.Infrastructure.Storage;
 
 namespace PerformanceTracker.Desktop.Services;
@@ -10,8 +11,11 @@ namespace PerformanceTracker.Desktop.Services;
 public sealed class ProcessOverviewService(
     IProcessInventory inventory,
     SqliteSampleRepository repository,
-    IOptions<RetentionSettings> retention)
+    IOptions<RetentionSettings> retention,
+    WslMonitor wsl)
 {
+    private const string WslKey = "vmmemwsl";
+
     private readonly ProcessActivityTracker _tracker = new(Environment.ProcessorCount);
     private readonly ProcessActivityTracker _eventTracker = new(Environment.ProcessorCount);
     private readonly object _lock = new();
@@ -40,13 +44,35 @@ public sealed class ProcessOverviewService(
                 groups = AppGroupBuilder.Build(processes, activity, Environment.ProcessId);
             }
 
+            groups = AddWslActivity(groups);
+
             AppRowViewModel.CacheIcons(groups);
             return groups;
         });
 
-    private static string DescribeForHistory(string key, RunningProcessInfo[] members)
+    // The WSL row otherwise only says "WSL memory"; name what's busy inside Linux.
+    private IReadOnlyList<AppGroup> AddWslActivity(IReadOnlyList<AppGroup> groups)
+    {
+        IReadOnlyList<WslActivity> inside = wsl.Current;
+        if (inside.Count == 0)
+        {
+            return groups;
+        }
+
+        return groups.Select(group => group.Key == WslKey
+            ? group with { TopActivity = WslSummary.Label(inside[0]), Detail = WslSummary.Describe(inside) }
+            : group).ToArray();
+    }
+
+    private string DescribeForHistory(string key, RunningProcessInfo[] members)
     {
         string name = ProcessCatalog.Lookup(key)?.DisplayName ?? members[0].FileDescription ?? members[0].Name;
+        if (key == WslKey)
+        {
+            IReadOnlyList<WslActivity> inside = wsl.Current;
+            return inside.Count == 0 ? name : $"{name} ({WslSummary.Label(inside[0])})";
+        }
+
         if (!DevProcessRecognizer.IsHost(key))
         {
             return name;

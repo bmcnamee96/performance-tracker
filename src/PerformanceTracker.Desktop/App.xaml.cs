@@ -61,6 +61,7 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<ISampleRepository>(provider => provider.GetRequiredService<SqliteSampleRepository>());
                 services.AddSingleton<IProcessInventory, WindowsProcessInventory>();
                 services.AddSingleton<IProcessTerminator, WindowsProcessTerminator>();
+                services.AddSingleton<WslMonitor>();
                 services.AddSingleton<ProcessOverviewService>();
                 services.AddSingleton(_ => new ProcessActionsService(System.IO.Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
