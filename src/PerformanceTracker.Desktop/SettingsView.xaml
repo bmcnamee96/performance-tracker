@@ -31,7 +31,7 @@
   </UserControl.Resources>
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <Grid Margin="12">
+    <Grid Margin="12" MaxWidth="1000" HorizontalAlignment="Left">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="*" />
@@ -50,7 +50,7 @@
             <TextBlock Style="{StaticResource CardTitle}" Text="Notifications" />
           </DockPanel>
 
-          <CheckBox x:Name="MemoryAlert" Margin="0,14,0,0" Style="{StaticResource ToggleSwitch}" Click="AlertChanged">
+          <CheckBox x:Name="MemoryAlert" Margin="0,14,0,0" Style="{StaticResource ToggleSwitch}" Click="AlertChanged" AutomationProperties.Name="Notify me when memory is running out">
             <StackPanel>
               <TextBlock Style="{StaticResource RowTitle}" Text="Memory running out" />
               <TextBlock Style="{StaticResource RowHint}" Text="Tell me when memory stays high for a minute, and which app is using the most." />
@@ -64,14 +64,14 @@
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock VerticalAlignment="Center" Foreground="#C3D0DC" Text="Warn me at" />
-            <Slider x:Name="Threshold" Grid.Column="1" Margin="14,0" Minimum="60" Maximum="98" TickFrequency="1"
+            <Slider x:Name="Threshold" Grid.Column="1" Margin="14,0" Minimum="60" Maximum="98" TickFrequency="1" AutomationProperties.Name="Warn me when memory is this full (percent)"
                     IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="ThresholdChanged" />
             <TextBlock x:Name="ThresholdText" Grid.Column="2" MinWidth="80" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#E6EEF5" Text="90% full" />
           </Grid>
 
           <Border Style="{StaticResource Divider}" />
 
-          <CheckBox x:Name="GrowthAlert" Style="{StaticResource ToggleSwitch}" Click="AlertChanged">
+          <CheckBox x:Name="GrowthAlert" Style="{StaticResource ToggleSwitch}" Click="AlertChanged" AutomationProperties.Name="Notify me when an app keeps growing">
             <StackPanel>
               <TextBlock Style="{StaticResource RowTitle}" Text="An app keeps growing" />
               <TextBlock Style="{StaticResource RowHint}" Text="Tell me when one app's memory use climbs steadily, which can mean it's leaking memory." />
@@ -86,7 +86,7 @@
       <Border Grid.Row="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Style="{StaticResource Card}">
         <StackPanel>
           <TextBlock Style="{StaticResource CardTitle}" Text="Startup" />
-          <CheckBox x:Name="LaunchAtSignIn" Margin="0,14,0,0" Style="{StaticResource ToggleSwitch}" Click="LaunchChanged">
+          <CheckBox x:Name="LaunchAtSignIn" Margin="0,14,0,0" Style="{StaticResource ToggleSwitch}" Click="LaunchChanged" AutomationProperties.Name="Start when I sign in to Windows">
             <StackPanel>
               <TextBlock Style="{StaticResource RowTitle}" Text="Start when I sign in to Windows" />
               <TextBlock Style="{StaticResource RowHint}" Text="Opens quietly in the system tray, so slowdowns are recorded and notifications work without opening the window." />
@@ -116,7 +116,7 @@
             <TextBlock x:Name="CpuRule" Grid.Column="1" Style="{StaticResource FactValue}" />
             <TextBlock Grid.Row="1" Style="{StaticResource FactLabel}" Text="Memory full" />
             <TextBlock x:Name="MemoryRule" Grid.Row="1" Grid.Column="1" Style="{StaticResource FactValue}" />
-            <TextBlock Grid.Row="2" Style="{StaticResource FactLabel}" Text="Disk busy" />
+            <TextBlock Grid.Row="2" Style="{StaticResource FactLabel}" Text="Windows drive slow" />
             <TextBlock x:Name="DiskRule" Grid.Row="2" Grid.Column="1" Style="{StaticResource FactValue}" />
             <TextBlock Grid.Row="3" Style="{StaticResource FactLabel}" Text="Checks your PC" />
             <TextBlock x:Name="IntervalRule" Grid.Row="3" Grid.Column="1" Style="{StaticResource FactValue}" />
@@ -131,13 +131,14 @@
             <Button DockPanel.Dock="Right" VerticalAlignment="Center" Style="{StaticResource LinkButton}" Content="Open folder" Click="OpenDataFolderClick" />
             <TextBlock Style="{StaticResource CardTitle}" Text="Your data" />
           </DockPanel>
-          <TextBlock Style="{StaticResource RowHint}" Margin="0,4,0,8" Text="Everything stays on this PC. Nothing is uploaded." />
+          <TextBlock Style="{StaticResource RowHint}" Margin="0,4,0,8" Text="Everything stays on this PC. Older data is cleaned up automatically." />
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
@@ -149,8 +150,10 @@
             <TextBlock x:Name="AppRetention" Grid.Row="1" Grid.Column="1" Style="{StaticResource FactValue}" />
             <TextBlock Grid.Row="2" Style="{StaticResource FactLabel}" Text="Detailed readings" />
             <TextBlock x:Name="SampleRetention" Grid.Row="2" Grid.Column="1" Style="{StaticResource FactValue}" />
-            <TextBlock Grid.Row="3" Style="{StaticResource FactLabel}" Text="Space used" />
-            <TextBlock x:Name="DataSize" Grid.Row="3" Grid.Column="1" Style="{StaticResource FactValue}" />
+            <TextBlock Grid.Row="3" Style="{StaticResource FactLabel}" Text="Daily averages" />
+            <TextBlock x:Name="SummaryRetention" Grid.Row="3" Grid.Column="1" Style="{StaticResource FactValue}" />
+            <TextBlock Grid.Row="4" Style="{StaticResource FactLabel}" Text="Space used" />
+            <TextBlock x:Name="DataSize" Grid.Row="4" Grid.Column="1" Style="{StaticResource FactValue}" />
           </Grid>
         </StackPanel>
       </Border>

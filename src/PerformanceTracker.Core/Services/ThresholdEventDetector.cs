@@ -34,7 +34,7 @@ public sealed class ThresholdEventDetector : IEventDetector
         [
             new PerformanceEvent
             {
-                StartedAtUtc = recentSamples[0].TimestampUtc,
+                StartedAtUtc = FindEpisodeStart(recentSamples),
                 EndedAtUtc = latest.TimestampUtc,
                 Severity = insight.Severity,
                 Summary = insight.Title,
@@ -46,4 +46,24 @@ public sealed class ThresholdEventDetector : IEventDetector
             }
         ];
     }
+
+    /// <summary>
+    /// Walks back from the latest reading while readings stay elevated, so a slowdown starts when the
+    /// pressure began rather than at the oldest reading in the context window.
+    /// </summary>
+    private DateTimeOffset FindEpisodeStart(IReadOnlyList<MetricSample> recentSamples)
+    {
+        int start = recentSamples.Count - 1;
+        while (start > 0 && IsElevated(recentSamples[start - 1]))
+        {
+            start--;
+        }
+
+        return recentSamples[start].TimestampUtc;
+    }
+
+    private bool IsElevated(MetricSample sample) =>
+        sample.CpuUsagePercent >= _settings.CpuHighPercent - 7 ||
+        sample.MemoryUsedPercent >= _settings.MemoryHighPercent - 5 ||
+        sample.DiskActiveTimePercent >= _settings.DiskActiveHighPercent - 10;
 }

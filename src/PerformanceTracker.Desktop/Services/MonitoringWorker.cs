@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using PerformanceTracker.Core.Configuration;
 using PerformanceTracker.Core.Interfaces;
 using PerformanceTracker.Core.Models;
+using PerformanceTracker.Core.Services;
 
 namespace PerformanceTracker.Desktop.Services;
 
@@ -18,7 +19,8 @@ public sealed partial class MonitoringWorker : BackgroundService
     private readonly ILogger<MonitoringWorker> _logger;
     private readonly CollectorSettings _collectorSettings;
     private readonly Queue<MetricSample> _recentSamples = new();
-    private DateTimeOffset? _lastPersistedEventAtUtc;
+    private PerformanceEvent? _episode;
+    private long _episodeId;
 
     public MonitoringWorker(
         IMetricCollector metricCollector,
@@ -48,7 +50,15 @@ public sealed partial class MonitoringWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await CaptureAsync(stoppingToken);
+            try
+            {
+                await CaptureAsync(stoppingToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // One bad reading (database busy, a counter failing) must never stop monitoring for good.
+                LogCaptureFailed(_logger, exception);
+            }
 
             try
             {
@@ -65,8 +75,6 @@ public sealed partial class MonitoringWorker : BackgroundService
     {
         MetricSample sample = await _metricCollector.CollectAsync(cancellationToken);
         string? foregroundApp = _foregroundAppTracker.GetForegroundProcessName();
-
-        await _sampleRepository.SaveMetricSampleAsync(sample, cancellationToken);
 
         _recentSamples.Enqueue(sample);
         TrimWindow(sample.TimestampUtc);
@@ -89,18 +97,38 @@ public sealed partial class MonitoringWorker : BackgroundService
             latestDetectedEvent = latestDetectedEvent with { LikelyCause = contributor };
         }
 
-        if (latestDetectedEvent is not null)
+        // Show the reading live first; saving can wait on the database without freezing the dashboard.
+        _monitoringState.Update(sample, latestDetectedEvent, foregroundApp);
+
+        try
         {
-            if (_lastPersistedEventAtUtc is null ||
-                latestDetectedEvent.EndedAtUtc - _lastPersistedEventAtUtc >= TimeSpan.FromSeconds(_collectorSettings.EventCooldownSeconds))
+            await _sampleRepository.SaveMetricSampleAsync(sample, cancellationToken);
+            if (latestDetectedEvent is not null)
             {
-                await _sampleRepository.SavePerformanceEventAsync(latestDetectedEvent, cancellationToken);
-                _lastPersistedEventAtUtc = latestDetectedEvent.EndedAtUtc;
+                await SaveEpisodeAsync(latestDetectedEvent, cancellationToken);
             }
         }
+        catch (Microsoft.Data.Sqlite.SqliteException exception)
+        {
+            LogSaveFailed(_logger, exception);
+        }
 
-        _monitoringState.Update(sample, latestDetectedEvent, foregroundApp);
         LogCapturedTelemetrySample(_logger, sample.TimestampUtc);
+    }
+
+    private async Task SaveEpisodeAsync(PerformanceEvent detected, CancellationToken cancellationToken)
+    {
+        // One saved row per slowdown, extended in place while it continues.
+        if (_episode is not null && EventMerging.TryMerge(_episode, detected) is { } merged)
+        {
+            _episode = merged;
+            await _sampleRepository.UpdatePerformanceEventAsync(_episodeId, merged, cancellationToken);
+        }
+        else
+        {
+            _episode = detected;
+            _episodeId = await _sampleRepository.SavePerformanceEventAsync(detected, cancellationToken);
+        }
     }
 
     private void TrimWindow(DateTimeOffset latestTimestamp)
@@ -112,6 +140,12 @@ public sealed partial class MonitoringWorker : BackgroundService
             _recentSamples.Dequeue();
         }
     }
+
+    [LoggerMessage(EventId = 1002, Level = LogLevel.Warning, Message = "Taking a reading failed; monitoring continues.")]
+    private static partial void LogCaptureFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 1003, Level = LogLevel.Warning, Message = "Saving a reading failed (database busy?); monitoring continues.")]
+    private static partial void LogSaveFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(EventId = 1001, Level = LogLevel.Warning, Message = "App memory history is temporarily unavailable.")]
     private static partial void LogHistoryUnavailable(ILogger logger, Exception exception);

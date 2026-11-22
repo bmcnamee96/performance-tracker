@@ -77,6 +77,7 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<MonitoringState>();
                 services.AddSingleton<TrayIconService>();
                 services.AddHostedService<MonitoringWorker>();
+                services.AddHostedService<RetentionWorker>();
                 services.AddSingleton<MainWindow>();
             })
             .Build();

@@ -10,7 +10,7 @@ namespace PerformanceTracker.Core.Services;
 public static class EventMerging
 {
     /// <summary>Largest gap between two reports that still counts as the same slowdown.</summary>
-    public static readonly TimeSpan MaxGap = TimeSpan.FromSeconds(20);
+    public static readonly TimeSpan MaxGap = TimeSpan.FromSeconds(10);
 
     /// <summary>Returns the combined event when <paramref name="next"/> continues <paramref name="previous"/>, otherwise null.</summary>
     public static PerformanceEvent? TryMerge(PerformanceEvent previous, PerformanceEvent next)

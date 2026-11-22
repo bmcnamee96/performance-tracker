@@ -100,7 +100,7 @@ public sealed class AlertService(
         {
             Notify($"Memory at {sample.MemoryUsedPercent:F0}%",
                 biggest is null ? "Open Apps & Memory to see what's using memory." :
-                $"{biggest.DisplayName} is using {AppRowViewModel.FormatBytes(biggest.MemoryBytes)}.", biggest?.Key);
+                $"{biggest.NameWithActivity} is using {AppRowViewModel.FormatBytes(biggest.MemoryBytes)}.", biggest?.Key);
         }
     }
 

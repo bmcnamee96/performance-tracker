@@ -6,6 +6,7 @@ using PerformanceTracker.Core.Configuration;
 using PerformanceTracker.Core.Models;
 using PerformanceTracker.Core.Services;
 using PerformanceTracker.Desktop.Services;
+using PerformanceTracker.Infrastructure.Storage;
 using Brush = System.Windows.Media.Brush;
 using BrushConverter = System.Windows.Media.BrushConverter;
 using Button = System.Windows.Controls.Button;
@@ -28,22 +29,31 @@ public partial class DashboardView : UserControl
     private static readonly Brush CriticalBrush = CreateBrush("#F97066");
     private static readonly Brush WarningBrush = CreateBrush("#FDB022");
     private static readonly Brush InfoBrush = CreateBrush("#53B1FD");
+    private static readonly Brush FooterBrush = CreateBrush("#6B7F94");
+
+    private static readonly TimeSpan SavedEventsRefreshInterval = TimeSpan.FromSeconds(30);
 
     private readonly MonitoringState _state;
+    private readonly SqliteSampleRepository _repository;
+    private IReadOnlyList<PerformanceEvent> _savedEvents = [];
+    private DateTime _nextSavedEventsRead = DateTime.MinValue;
+    private bool _readingSavedEvents;
     private readonly ProcessOverviewService _overview;
     private readonly CollectorSettings _settings;
     private readonly DispatcherTimer _timer;
     private readonly DashboardTileViewModel _cpu = new("Processor", CpuBrush);
     private readonly DashboardTileViewModel _memory = new("Memory", MemoryBrush);
-    private readonly DashboardTileViewModel _disk = new("Disk", DiskBrush);
+    private readonly DashboardTileViewModel _disk = new("Windows drive", DiskBrush);
     private readonly DashboardTileViewModel _network = new("Network", NetworkBrush);
     private readonly DashboardTileViewModel _gpu = new("Graphics", GpuBrush) { Visibility = Visibility.Collapsed };
     private DateTime _nextAppsRead = DateTime.MinValue;
     private bool _readingApps;
 
-    public DashboardView(MonitoringState state, ProcessOverviewService overview, IOptions<CollectorSettings> settings)
+    public DashboardView(MonitoringState state, ProcessOverviewService overview, IOptions<CollectorSettings> settings,
+        SqliteSampleRepository repository)
     {
         InitializeComponent();
+        _repository = repository;
         _state = state;
         _overview = overview;
         _settings = settings.Value;
@@ -80,6 +90,11 @@ public partial class DashboardView : UserControl
             _ = RefreshAppsAsync();
         }
 
+        if (DateTime.UtcNow >= _nextSavedEventsRead)
+        {
+            _ = RefreshSavedEventsAsync();
+        }
+
         UpdateEvents(snapshot);
         TimeSpan window = TimeSpan.FromSeconds(Math.Max(1, _settings.SampleIntervalSeconds) * Math.Max(1, snapshot.RecentSamples.Count));
         WindowCaption.Text = snapshot.RecentSamples.Count > 1 ? $"Charts show the last {FormatDuration(window)}" : string.Empty;
@@ -92,7 +107,11 @@ public partial class DashboardView : UserControl
 
         IReadOnlyList<MetricSample> recent = snapshot.RecentSamples;
         UpdateTiles(latest, recent);
-        FooterText.Text = $"PC on for {FormatDuration(latest.Uptime)}  ·  checking every {_settings.SampleIntervalSeconds}s  ·  last reading {FormatAge(latest.TimestampUtc)}";
+        bool stale = DateTimeOffset.UtcNow - latest.TimestampUtc > TimeSpan.FromSeconds(30);
+        FooterText.Text = stale
+            ? $"Readings have stopped. Last reading {FormatAge(latest.TimestampUtc)}. Restart the app from the tray icon if this lasts."
+            : $"PC on for {FormatDuration(latest.Uptime)}  ·  checking every {_settings.SampleIntervalSeconds}s  ·  last reading {FormatAge(latest.TimestampUtc)}";
+        FooterText.Foreground = stale ? WarningBrush : FooterBrush;
     }
 
     private void UpdateTiles(MetricSample latest, IReadOnlyList<MetricSample> recent)
@@ -117,14 +136,14 @@ public partial class DashboardView : UserControl
         _disk.Detail = latest.DiskReadMbPerSec is not null || latest.DiskWriteMbPerSec is not null
             ? $"Reading {Rate(latest.DiskReadMbPerSec)}  ·  writing {Rate(latest.DiskWriteMbPerSec)}"
             : $"Peak {Percent(Max(recent.Select(sample => sample.DiskActiveTimePercent)))}";
-        _disk.ToolTip = "How much of the time your disk is busy reading or writing.";
+        _disk.ToolTip = "How much of the time the drive Windows is installed on is busy reading or writing. Other drives aren't measured.";
         _disk.History = recent.Select(sample => sample.DiskActiveTimePercent).ToArray();
 
         double? down = latest.NetworkReceiveKbps;
         double peakDown = Max(recent.Select(sample => sample.NetworkReceiveKbps)) ?? 0;
         _network.Value = down is null ? "--" : NetworkRate(down.Value);
-        _network.Detail = latest.NetworkSendKbps is double up ? $"Downloading  ·  {NetworkRate(up)} up" : "Downloading";
-        _network.ToolTip = "Data coming in (the chart) and going out over your network connection.";
+        _network.Detail = latest.NetworkSendKbps is double up ? $"Down  ·  {NetworkRate(up)} up" : "Down";
+        _network.ToolTip = "Data coming in (the big number and the chart) and going out over your internet connection.";
         _network.History = recent.Select(sample => sample.NetworkReceiveKbps).ToArray();
         _network.Maximum = Math.Max(peakDown * 1.15, 100);
 
@@ -173,9 +192,32 @@ public partial class DashboardView : UserControl
         }
     }
 
+    private async Task RefreshSavedEventsAsync()
+    {
+        if (_readingSavedEvents)
+        {
+            return;
+        }
+
+        _readingSavedEvents = true;
+        _nextSavedEventsRead = DateTime.UtcNow + SavedEventsRefreshInterval;
+        try
+        {
+            _savedEvents = await Task.Run(() => _repository.ReadPerformanceEvents(DateTimeOffset.UtcNow.AddDays(-1)));
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException)
+        {
+            // Keep showing what we have; the next refresh will try again.
+        }
+        finally
+        {
+            _readingSavedEvents = false;
+        }
+    }
+
     private void UpdateEvents(MonitoringSnapshot snapshot)
     {
-        DashboardEventItem[] items = snapshot.RecentEvents
+        DashboardEventItem[] items = SlowdownHistory.Consolidate(_savedEvents.Concat(snapshot.RecentEvents))
             .OrderByDescending(performanceEvent => performanceEvent.EndedAtUtc)
             .Take(5)
             .Select(performanceEvent => new DashboardEventItem(

@@ -49,6 +49,8 @@ public partial class TimelineView : UserControl
         };
     }
 
+    private bool _reloadRequested;
+
     private async void RangeChanged(object sender, RoutedEventArgs e)
     {
         if (IsLoaded)
@@ -61,24 +63,27 @@ public partial class TimelineView : UserControl
     {
         if (_loading)
         {
+            // Picked another range mid-load: load again once this one finishes so the chips and results agree.
+            _reloadRequested = true;
             return;
         }
 
         _loading = true;
         try
         {
-            DateTime today = DateTime.Today;
-            bool hourly = RangeToday.IsChecked == true;
-            int days = RangeMonth.IsChecked == true ? 30 : RangeWeek.IsChecked == true ? 7 : 1;
-            DateTimeOffset since = new(today.AddDays(1 - days));
-
-            IReadOnlyList<PerformanceEvent> saved = await Task.Run(() => _repository.ReadPerformanceEvents(since));
-            IReadOnlyList<PerformanceEvent> events = SlowdownHistory.Consolidate(
-                saved.Concat(_state.GetSnapshot().RecentEvents.Where(e => e.EndedAtUtc >= since)));
-
-            ShowTotals(events);
-            ShowBars(events, since, hourly, days);
-            ShowDays(events);
+            do
+            {
+                _reloadRequested = false;
+                int days = RangeMonth.IsChecked == true ? 30 : RangeWeek.IsChecked == true ? 7 : 1;
+                ContentRoot.Opacity = 0.55;
+                IReadOnlyList<PerformanceEvent> live = _state.GetSnapshot().RecentEvents;
+                TimelineData data = await Task.Run(() => Build(days, live));
+                if (!_reloadRequested)
+                {
+                    Show(data);
+                }
+            }
+            while (_reloadRequested);
         }
         catch (Exception ex) when (ex is SqliteException or InvalidOperationException or System.IO.IOException)
         {
@@ -89,33 +94,71 @@ public partial class TimelineView : UserControl
         finally
         {
             _loading = false;
+            ContentRoot.Opacity = 1;
         }
     }
 
-    private void ShowTotals(IReadOnlyList<PerformanceEvent> events)
+    // Runs off the UI thread: reads the database, merges reports and prepares everything the view shows.
+    private TimelineData Build(int days, IReadOnlyList<PerformanceEvent> live)
     {
-        SlowdownTotals totals = SlowdownHistory.Totals(events);
-        CountText.Text = totals.Count.ToString(CultureInfo.CurrentCulture);
-        TotalText.Text = totals.Count == 0 ? "None" : FormatLength(totals.TotalTime);
-        CommonText.Text = totals.MostCommon ?? "Nothing yet";
-        EmptyState.Visibility = events.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        TimeZoneInfo zone = TimeZoneInfo.Local;
+        DateTime today = DateTime.Now.Date;
+        DateTime firstDay = today.AddDays(1 - days);
+        DateTimeOffset since = SlowdownHistory.LocalMidnight(firstDay, zone);
+        DateTimeOffset until = SlowdownHistory.LocalMidnight(today.AddDays(1), zone);
+
+        IReadOnlyList<PerformanceEvent> events = SlowdownHistory.Consolidate(
+            _repository.ReadPerformanceEvents(since).Concat(live.Where(e => e.EndedAtUtc >= since)));
+
+        SlowdownTotals totals = SlowdownHistory.Totals(events, since, until);
+        bool hourly = days == 1;
+        IReadOnlyList<DateTimeOffset> edges = hourly
+            ? SlowdownHistory.HourBoundaries(today, zone)
+            : SlowdownHistory.DayBoundaries(firstDay, days, zone);
+        TimelineBar[] bars = BuildBars(events, edges, hourly, days);
+
+        TimelineDay[] dayGroups = events
+            .GroupBy(e => Max(TimeZoneInfo.ConvertTime(e.StartedAtUtc, zone).Date, firstDay))
+            .OrderByDescending(group => group.Key)
+            .Select(group =>
+            {
+                PerformanceEvent[] dayEvents = group.OrderByDescending(e => e.StartedAtUtc).ToArray();
+                SlowdownTotals dayTotals = SlowdownHistory.Totals(events,
+                    SlowdownHistory.LocalMidnight(group.Key, zone), SlowdownHistory.LocalMidnight(group.Key.AddDays(1), zone));
+                string title = group.Key == today ? "Today"
+                    : group.Key == today.AddDays(-1) ? "Yesterday"
+                    : group.Key.ToString("dddd, MMMM d", CultureInfo.CurrentCulture);
+                string summary = $"{dayTotals.Count} slowdown{(dayTotals.Count == 1 ? string.Empty : "s")}  ·  {FormatLength(dayTotals.TotalTime)}";
+                return new TimelineDay(title, summary, dayEvents.Select(e => ToEntry(e, zone, group.Key)).ToArray());
+            })
+            .ToArray();
+
+        return new TimelineData(totals, bars, dayGroups);
     }
 
-    private void ShowBars(IReadOnlyList<PerformanceEvent> events, DateTimeOffset since, bool hourly, int days)
+    private void Show(TimelineData data)
     {
-        TimeSpan bucket = hourly ? TimeSpan.FromHours(1) : TimeSpan.FromDays(1);
-        int count = hourly ? 24 : days;
-        double[] minutes = SlowdownHistory.MinutesPerBucket(events, since, bucket, count);
-        double max = Math.Max(minutes.Max(), 5);
+        CountText.Text = data.Totals.Count.ToString(CultureInfo.CurrentCulture);
+        TotalText.Text = data.Totals.Count == 0 ? "None" : FormatLength(data.Totals.TotalTime);
+        CommonText.Text = data.Totals.MostCommon ?? "Nothing yet";
+        EmptyState.Visibility = data.Days.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        Bars.ItemsSource = data.Bars;
+        BarLabels.ItemsSource = data.Bars;
+        Days.ItemsSource = data.Days;
+    }
 
-        TimelineBar[] bars = minutes.Select((value, index) =>
+    private static TimelineBar[] BuildBars(IReadOnlyList<PerformanceEvent> events, IReadOnlyList<DateTimeOffset> edges, bool hourly, int days)
+    {
+        double[] minutes = SlowdownHistory.MinutesPerBucket(events, edges);
+        double max = Math.Max(minutes.DefaultIfEmpty(0).Max(), 5);
+        return minutes.Select((value, index) =>
         {
-            DateTime start = since.LocalDateTime + bucket * index;
+            DateTime start = TimeZoneInfo.ConvertTime(edges[index], TimeZoneInfo.Local).DateTime;
             string when = hourly
                 ? start.ToString("h tt", CultureInfo.CurrentCulture)
                 : start.ToString("ddd, MMM d", CultureInfo.CurrentCulture);
             string label = hourly
-                ? index % 6 == 0 ? start.ToString("h tt", CultureInfo.CurrentCulture).ToLowerInvariant() : string.Empty
+                ? start.Hour % 6 == 0 && start.Minute == 0 ? start.ToString("h tt", CultureInfo.CurrentCulture).ToLowerInvariant() : string.Empty
                 : days <= 7 || index % 5 == 0 ? start.ToString(days <= 7 ? "ddd" : "MMM d", CultureInfo.CurrentCulture) : string.Empty;
             string amount = value < 0.5 ? (value > 0 ? "under a minute" : "no slowdowns") : $"{Math.Round(value)} min slowed";
             return new TimelineBar(
@@ -124,31 +167,11 @@ public partial class TimelineView : UserControl
                 $"{when}: {amount}",
                 label);
         }).ToArray();
-
-        Bars.ItemsSource = bars;
-        BarLabels.ItemsSource = bars;
     }
 
-    private void ShowDays(IReadOnlyList<PerformanceEvent> events)
-    {
-        DateTime today = DateTime.Today;
-        Days.ItemsSource = events
-            .GroupBy(e => e.StartedAtUtc.LocalDateTime.Date)
-            .OrderByDescending(group => group.Key)
-            .Select(group =>
-            {
-                PerformanceEvent[] dayEvents = group.OrderByDescending(e => e.StartedAtUtc).ToArray();
-                SlowdownTotals totals = SlowdownHistory.Totals(dayEvents);
-                string title = group.Key == today ? "Today"
-                    : group.Key == today.AddDays(-1) ? "Yesterday"
-                    : group.Key.ToString("dddd, MMMM d", CultureInfo.CurrentCulture);
-                string summary = $"{totals.Count} slowdown{(totals.Count == 1 ? string.Empty : "s")}  ·  {FormatLength(totals.TotalTime)}";
-                return new TimelineDay(title, summary, dayEvents.Select(ToEntry).ToArray());
-            })
-            .ToArray();
-    }
+    private static DateTime Max(DateTime left, DateTime right) => left > right ? left : right;
 
-    private static TimelineEntry ToEntry(PerformanceEvent performanceEvent)
+    private static TimelineEntry ToEntry(PerformanceEvent performanceEvent, TimeZoneInfo zone, DateTime shownDay)
     {
         List<string> chips = [];
         if (!string.IsNullOrWhiteSpace(performanceEvent.ForegroundApp))
@@ -172,7 +195,9 @@ public partial class TimelineView : UserControl
             chips.Add($"Disk {disk:F0}%");
         }
 
-        string time = performanceEvent.StartedAtUtc.LocalDateTime.ToString("h:mm tt", CultureInfo.CurrentCulture);
+        DateTimeOffset localStart = TimeZoneInfo.ConvertTime(performanceEvent.StartedAtUtc, zone);
+        string time = localStart.ToString("h:mm tt", CultureInfo.CurrentCulture) +
+            (localStart.Date < shownDay ? " (day before)" : string.Empty);
         string length = EventMerging.DescribeDuration(performanceEvent);
         return new TimelineEntry(
             performanceEvent.Summary,
@@ -202,6 +227,9 @@ public partial class TimelineView : UserControl
         return brush;
     }
 }
+
+/// <summary>Everything the timeline shows for one range, prepared off the UI thread.</summary>
+internal sealed record TimelineData(SlowdownTotals Totals, TimelineBar[] Bars, TimelineDay[] Days);
 
 /// <summary>One bar in the timeline chart.</summary>
 public sealed record TimelineBar(double Height, Brush Fill, string ToolTip, string Label);

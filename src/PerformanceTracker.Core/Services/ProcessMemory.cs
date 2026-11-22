@@ -14,6 +14,10 @@ public static class ProcessMemory
         "Memory Compression"
     };
 
+    /// <summary>True for processes whose shown memory is the full working set (VM hosts, Memory Compression).</summary>
+    public static bool UsesWorkingSet(string name) =>
+        WorkingSetProcesses.Contains(name);
+
     /// <summary>Memory to show for one process: private working set, or the full working set for VM hosts.</summary>
     public static long Effective(string name, long privateWorkingSet, long workingSet)
     {

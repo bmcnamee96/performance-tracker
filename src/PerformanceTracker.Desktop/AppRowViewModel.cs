@@ -175,6 +175,9 @@ public sealed class AppRowViewModel : INotifyPropertyChanged
 
     public string DisplayName => _group.DisplayName;
 
+    /// <summary>What a developer tool is running, e.g. "Fantasy-Valorant · Vite dev server"; empty otherwise.</summary>
+    public string TopActivity => _group.TopActivity is { } activity ? $"  {activity}" : string.Empty;
+
     public string CountText => _group.ProcessIds.Count == 1 ? "1 process" : $"{_group.ProcessIds.Count} processes";
 
     public string Explanation => _group.Explanation;
@@ -231,7 +234,9 @@ public sealed class AppRowViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
     }
 
-    public string MemoryTooltip => $"Private memory in RAM: {MemoryText}\n" +
+    public string MemoryTooltip => (ProcessMemory.UsesWorkingSet(_group.Key)
+            ? $"Memory in RAM, including the virtual machine's own RAM: {MemoryText}\n"
+            : $"Private memory in RAM: {MemoryText}\n") +
         $"Total in RAM (includes shared memory): {FormatBytes(_group.Targets.Sum(process => process.WorkingSetBytes))}\n" +
         $"Private commit (in RAM or backed by the page file): {FormatBytes(_group.Targets.Sum(process => process.PrivateCommitBytes))}";
 

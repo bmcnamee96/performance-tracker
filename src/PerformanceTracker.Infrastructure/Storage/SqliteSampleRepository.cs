@@ -307,7 +307,7 @@ public sealed partial class SqliteSampleRepository : ISampleRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    public async Task SavePerformanceEventAsync(PerformanceEvent performanceEvent, CancellationToken cancellationToken)
+    public async Task<long> SavePerformanceEventAsync(PerformanceEvent performanceEvent, CancellationToken cancellationToken)
     {
         await using SqliteConnection connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
@@ -411,9 +411,39 @@ public sealed partial class SqliteSampleRepository : ISampleRepository
         command.Parameters.AddWithValue("$triggerMemoryPercent", performanceEvent.TriggerSample.MemoryUsedPercent);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
+
+        command.Parameters.Clear();
+        command.CommandText = "SELECT last_insert_rowid();";
+        return (long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
     }
 
-    private SqliteConnection CreateConnection() => new($"Data Source={_databasePath}");
+    public async Task UpdatePerformanceEventAsync(long id, PerformanceEvent performanceEvent, CancellationToken cancellationToken)
+    {
+        await using SqliteConnection connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE performance_events SET
+              started_at_utc = $startedAtUtc,
+              ended_at_utc = $endedAtUtc,
+              severity = $severity,
+              summary = $summary,
+              likely_cause = $likelyCause,
+              foreground_app = $foregroundApp
+            WHERE id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$startedAtUtc", performanceEvent.StartedAtUtc.UtcDateTime.ToString("O"));
+        command.Parameters.AddWithValue("$endedAtUtc", performanceEvent.EndedAtUtc.UtcDateTime.ToString("O"));
+        command.Parameters.AddWithValue("$severity", (int)performanceEvent.Severity);
+        command.Parameters.AddWithValue("$summary", performanceEvent.Summary);
+        command.Parameters.AddWithValue("$likelyCause", performanceEvent.LikelyCause);
+        command.Parameters.AddWithValue("$foregroundApp", (object?)performanceEvent.ForegroundApp ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private SqliteConnection CreateConnection() => new($"Data Source={_databasePath};Default Timeout=120");
 
     private static void AddNullable(SqliteCommand command, string parameterName, double? value)
     {

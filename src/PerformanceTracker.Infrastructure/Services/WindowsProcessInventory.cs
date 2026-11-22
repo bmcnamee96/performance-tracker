@@ -31,7 +31,10 @@ public sealed class WindowsProcessInventory : IProcessInventory
         {
             var key = (process.Id, process.StartTimeUtc);
             alive.Add(key);
-            Details? details = includeDetails ? GetDetails(key, process.Id, process.Name) : TryGetCachedDetails(key);
+            // Developer tools (node, python, ...) always get details so slowdowns can name the project involved.
+            Details? details = includeDetails || DevProcessRecognizer.IsHost(process.Name)
+                ? GetDetails(key, process.Id, process.Name)
+                : TryGetCachedDetails(key);
             result.Add(process with
             {
                 WindowTitle = windowTitles.GetValueOrDefault(process.Id),
@@ -46,14 +49,11 @@ public sealed class WindowsProcessInventory : IProcessInventory
             });
         }
 
-        if (includeDetails)
+        lock (_cacheLock)
         {
-            lock (_cacheLock)
+            foreach ((int, DateTimeOffset?) stale in _detailsCache.Keys.Where(k => !alive.Contains(k)).ToArray())
             {
-                foreach ((int, DateTimeOffset?) stale in _detailsCache.Keys.Where(k => !alive.Contains(k)).ToArray())
-                {
-                    _detailsCache.Remove(stale);
-                }
+                _detailsCache.Remove(stale);
             }
         }
 

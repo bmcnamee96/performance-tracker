@@ -105,8 +105,14 @@ public static class AppGroupBuilder
             caution = role.Consequence;
         }
 
+        RunningProcessInfo heaviest = members.MaxBy(m => m.MemoryBytes) ?? members[0];
+        string? topActivity = includeProcesses && !subgroup && DevProcessRecognizer.IsHost(key)
+            ? DescribeDevActivity(heaviest)
+            : null;
+
         return new AppGroup
         {
+            TopActivity = topActivity,
             Key = subgroupKey ?? (includeProcesses ? key : $"{members[0].Id}/{members[0].StartTimeUtc:O}"),
             DisplayName = subgroup ? DescribeTool(members[0], includeProject: true)
                 : includeProcesses ? displayName
@@ -175,6 +181,17 @@ public static class AppGroupBuilder
         hasService ? "Includes a Windows background service."
         : hasWindow ? "App with an open window."
         : "Program running in the background with no window.";
+
+    /// <summary>
+    /// "Project · tool" for a developer-tool process (e.g. "Fantasy-Valorant · Vite dev server", "Python: atlas_crawl.py"),
+    /// or null when nothing more specific than the executable name is known.
+    /// </summary>
+    public static string? DescribeDevActivity(RunningProcessInfo process)
+    {
+        var (tool, project, _) = DevProcessRecognizer.Identify(process);
+        string? label = project is not null ? $"{DevProcessRecognizer.ProjectName(project)} · {tool}" : tool;
+        return string.Equals(label, process.Name, StringComparison.OrdinalIgnoreCase) ? null : label;
+    }
 
     private static string DescribeTool(RunningProcessInfo process, bool includeProject)
     {

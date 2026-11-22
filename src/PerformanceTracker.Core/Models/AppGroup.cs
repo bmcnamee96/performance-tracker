@@ -70,6 +70,15 @@ public sealed record AppGroup
 
     public bool HasWindow { get; init; }
 
+    /// <summary>
+    /// For developer tools such as Node.js or Python: the project and tool using the most memory,
+    /// e.g. "Fantasy-Valorant · Vite dev server". Null for ordinary apps.
+    /// </summary>
+    public string? TopActivity { get; init; }
+
+    /// <summary>Display name plus <see cref="TopActivity"/> when known, e.g. "Node.js (Fantasy-Valorant · Vite dev server)".</summary>
+    public string NameWithActivity => TopActivity is null ? DisplayName : $"{DisplayName} ({TopActivity})";
+
     /// <summary>True when the app looks unused and is worth ending to free memory.</summary>
     public bool IsSuggested { get; init; }
 

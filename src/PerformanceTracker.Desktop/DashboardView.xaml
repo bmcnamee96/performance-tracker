@@ -134,7 +134,10 @@
                                   Background="{Binding StatusBackground}">
                             <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{Binding StatusBrush}" Text="{Binding StatusText}" />
                           </Border>
-                          <TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock TextTrimming="CharacterEllipsis">
+                            <Run FontWeight="SemiBold" Text="{Binding DisplayName, Mode=OneWay}" />
+                            <Run Foreground="#8EA3B8" Text="{Binding TopActivity, Mode=OneWay}" />
+                          </TextBlock>
                         </DockPanel>
                         <ProgressBar Height="5" Margin="0,6,0,0" Maximum="1" Value="{Binding MemoryFraction, Mode=OneWay}"
                                      Foreground="#42CED9" Background="#22364A" BorderThickness="0" />
@@ -185,7 +188,7 @@
             </ItemsControl>
           </ScrollViewer>
           <StackPanel x:Name="EventsEmpty" Grid.Row="1">
-            <TextBlock Foreground="#C3D0DC" TextWrapping="Wrap" Text="No slowdowns so far." />
+            <TextBlock Foreground="#C3D0DC" TextWrapping="Wrap" Text="No slowdowns in the last 24 hours." />
             <TextBlock Margin="0,4,0,0" Foreground="#8EA3B8" TextWrapping="Wrap"
                        Text="If your PC gets bogged down, for example memory nearly full or the processor maxed out, you'll see what happened and why here." />
           </StackPanel>

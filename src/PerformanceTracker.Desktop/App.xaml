@@ -80,6 +80,41 @@
 
     <Style TargetType="CheckBox">
       <Setter Property="Foreground" Value="{StaticResource ThemeTextBrush}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <Grid Background="Transparent">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Border x:Name="Box" Width="16" Height="16" CornerRadius="4" Background="#162636"
+                      BorderBrush="#3A5671" BorderThickness="1" VerticalAlignment="Center">
+                <Path x:Name="Mark" Data="M 3.5 8 L 6.5 11 L 12.5 4.5" Stroke="#0A1420" StrokeThickness="2"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed" />
+              </Border>
+              <ContentPresenter Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource ThemeAccentBrush}" />
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Box" Property="Background" Value="{StaticResource ThemeAccentBrush}" />
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource ThemeAccentBrush}" />
+                <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Box" Property="BorderBrush" Value="#E6EEF5" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <!-- Default buttons and text boxes, so unstyled ones don't fall back to light system chrome. -->

@@ -44,6 +44,18 @@ public sealed class ProcessOverviewService(
             return groups;
         });
 
+    private static string DescribeForHistory(string key, RunningProcessInfo[] members)
+    {
+        string name = ProcessCatalog.Lookup(key)?.DisplayName ?? members[0].FileDescription ?? members[0].Name;
+        if (!DevProcessRecognizer.IsHost(key))
+        {
+            return name;
+        }
+
+        RunningProcessInfo heaviest = members.MaxBy(process => process.MemoryBytes) ?? members[0];
+        return AppGroupBuilder.DescribeDevActivity(heaviest) is { } activity ? $"{name} ({activity})" : name;
+    }
+
     public string? Observe(MetricSample sample, bool attribute)
     {
         bool hasBaseline = _previous.Length != 0;
@@ -62,7 +74,7 @@ public sealed class ProcessOverviewService(
             .GroupBy(process => process.Name.Trim().ToLowerInvariant())
             .Select(group => new AppMemorySample(
                 group.Key,
-                ProcessCatalog.Lookup(group.Key)?.DisplayName ?? group.First().FileDescription ?? group.First().Name,
+                DescribeForHistory(group.Key, group.ToArray()),
                 sample.TimestampUtc,
                 group.Sum(process => process.MemoryBytes),
                 group.Sum(process => activity[process.Id].CpuPercent),

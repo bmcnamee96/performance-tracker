@@ -103,6 +103,12 @@ public partial class MainWindow : Window
             return "Starting up...";
         }
 
+        TimeSpan sinceReading = DateTimeOffset.UtcNow - snapshot.LatestSample.TimestampUtc;
+        if (sinceReading > TimeSpan.FromSeconds(30))
+        {
+            return $"Not recording · last reading {FormatRelativeAge(snapshot.LatestSample.TimestampUtc)}";
+        }
+
         PerformanceEvent? latestEvent = snapshot.LatestEvent;
         return latestEvent is { Severity: EventSeverity.Critical or EventSeverity.Warning } &&
             DateTimeOffset.UtcNow - latestEvent.EndedAtUtc < TimeSpan.FromMinutes(15)

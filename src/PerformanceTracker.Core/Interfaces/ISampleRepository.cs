@@ -8,6 +8,10 @@ public interface ISampleRepository
 
     Task SaveMetricSampleAsync(MetricSample sample, CancellationToken cancellationToken);
 
-    Task SavePerformanceEventAsync(PerformanceEvent performanceEvent, CancellationToken cancellationToken);
+    /// <summary>Saves a new slowdown and returns its id, so it can be extended while it lasts.</summary>
+    Task<long> SavePerformanceEventAsync(PerformanceEvent performanceEvent, CancellationToken cancellationToken);
+
+    /// <summary>Updates a saved slowdown as it continues (end time, severity, title, cause).</summary>
+    Task UpdatePerformanceEventAsync(long id, PerformanceEvent performanceEvent, CancellationToken cancellationToken);
 }
 

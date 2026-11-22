@@ -92,9 +92,44 @@ public sealed class SlowdownHistoryTests
             EndedAtUtc = Start.AddMinutes(20),
             Summary = "Processor maxed out"
         };
+        DateTimeOffset[] edges = [Start.AddHours(-1), Start, Start.AddHours(1), Start.AddHours(2)];
 
-        double[] minutes = SlowdownHistory.MinutesPerBucket([spanning], Start.AddHours(-1), TimeSpan.FromHours(1), 3);
+        double[] minutes = SlowdownHistory.MinutesPerBucket([spanning], edges);
 
         Assert.Equal(new double[] { 10, 20, 0 }, minutes);
+    }
+
+    [Fact]
+    public void MidnightCrossingCountsOnlyTheMinutesInsideEachDay()
+    {
+        DateTimeOffset midnight = new(2026, 11, 23, 0, 0, 0, TimeSpan.Zero);
+        PerformanceEvent crossing = new()
+        {
+            StartedAtUtc = midnight.AddMinutes(-5),
+            EndedAtUtc = midnight.AddMinutes(5),
+            Summary = "Processor maxed out"
+        };
+
+        SlowdownTotals today = SlowdownHistory.Totals([crossing], midnight, midnight.AddDays(1));
+        SlowdownTotals yesterday = SlowdownHistory.Totals([crossing], midnight.AddDays(-1), midnight);
+
+        Assert.Equal(TimeSpan.FromMinutes(5), today.TotalTime);
+        Assert.Equal(TimeSpan.FromMinutes(5), yesterday.TotalTime);
+    }
+
+    [Fact]
+    public void ClockChangeDaysHaveTheRightNumberOfHours()
+    {
+        TimeZoneInfo zone = TimeZoneInfo.CreateCustomTimeZone("Test", TimeSpan.FromHours(-8), "Test", "Test", "Test daylight",
+        [
+            TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
+                new DateTime(2000, 1, 1), new DateTime(2100, 12, 31), TimeSpan.FromHours(1),
+                TimeZoneInfo.TransitionTime.CreateFloatingDateRule(new DateTime(1, 1, 1, 2, 0, 0), 3, 2, DayOfWeek.Sunday),
+                TimeZoneInfo.TransitionTime.CreateFloatingDateRule(new DateTime(1, 1, 1, 2, 0, 0), 11, 1, DayOfWeek.Sunday))
+        ]);
+
+        Assert.Equal(24, SlowdownHistory.HourBoundaries(new DateTime(2026, 3, 8), zone).Count); // 23 hours
+        Assert.Equal(26, SlowdownHistory.HourBoundaries(new DateTime(2026, 11, 1), zone).Count); // 25 hours
+        Assert.Equal(25, SlowdownHistory.HourBoundaries(new DateTime(2026, 11, 22), zone).Count);
     }
 }

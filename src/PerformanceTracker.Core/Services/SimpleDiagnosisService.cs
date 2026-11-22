@@ -26,6 +26,7 @@ internal static class DiagnosisAnalyzer
     private const double MinimumNetworkSpikeKbps = 1024;
     private const long LowAvailableMemoryMb = 2048;
     private const long VeryLowAvailableMemoryMb = 1024;
+    private const int SustainedDiskSamples = 3;
 
     public static DiagnosisInsight Analyze(IReadOnlyList<MetricSample> recentSamples, CollectorSettings settings)
     {
@@ -72,6 +73,17 @@ internal static class DiagnosisAnalyzer
             && network.Latest >= Math.Max(MinimumNetworkSpikeKbps, networkBaseline * NetworkSpikeMultiplier);
 
         string topProcessFragment = BuildTopProcessFragment(latest);
+        string transfer = DescribeTransfer(latest);
+
+        // "Busy" is not the same as "slow": the disk can be 100% active while still answering quickly.
+        // Only blame the disk when it stayed busy and requests were actually waiting.
+        bool diskSustained = disk.HasAtLeast(SustainedDiskSamples)
+            && disk.TakeLast(SustainedDiskSamples).All(value => value >= settings.DiskActiveHighPercent);
+        double? diskResponse = latest.DiskAverageResponseMs;
+        double? diskQueue = latest.DiskQueueLength;
+        bool diskSlow = diskResponse is null && diskQueue is null
+            ? diskSustained
+            : diskResponse >= settings.DiskResponseHighMs || diskQueue >= settings.DiskQueueHighThreshold;
 
         if ((memoryHigh || (memoryRising && lowAvailableMemory)) && (diskHigh || diskRising || diskNearHigh))
         {
@@ -90,13 +102,13 @@ internal static class DiagnosisAnalyzer
         if ((sustainedCpu || cpuRising) && (diskNearHigh || memoryRising || memoryHigh || networkSpike))
         {
             string title = networkSpike
-                ? "Processor busy during a big download"
+                ? $"Processor busy during a big {transfer}"
                 : diskNearHigh
                     ? "Processor and disk both busy"
                     : "Processor maxed out";
 
             string cause = networkSpike
-                ? "Often a game update, cloud sync or streaming."
+                ? TransferCause(transfer)
                 : diskNearHigh
                     ? "Often an update, a virus scan or something installing."
                     : memoryHigh
@@ -133,30 +145,48 @@ internal static class DiagnosisAnalyzer
                 Severity: memoryHigh && veryLowAvailableMemory ? EventSeverity.Critical : EventSeverity.Warning);
         }
 
-        if (diskHigh || (diskRising && diskNearHigh))
+        if (diskSustained && diskSlow)
         {
+            string cause = diskResponse is double response
+                ? string.Create(CultureInfo.CurrentCulture, $"Your Windows drive took {response:0} ms to respond. Often an update, a virus scan, indexing or a big file copy.")
+                : "Often an update, a virus scan, indexing or a big file copy.";
             return new DiagnosisInsight(
                 HasSignal: true,
                 Title: "Disk very busy",
-                SummaryFragment: diskHigh
-                    ? "storage stayed saturated in the latest samples"
-                    : "storage activity ramped up quickly in the latest samples",
-                LikelyCause: "Often an update, a virus scan, indexing or a big file copy.",
-                Severity: disk.Latest >= 95 ? EventSeverity.Critical : EventSeverity.Warning);
+                SummaryFragment: "storage stayed saturated and requests were waiting",
+                LikelyCause: cause,
+                Severity: disk.Latest >= 95 && (diskResponse >= settings.DiskResponseHighMs * 2 || diskQueue >= settings.DiskQueueHighThreshold * 2)
+                    ? EventSeverity.Critical
+                    : EventSeverity.Warning);
         }
 
         if (networkSpike && (cpuNearHigh || diskNearHigh || memoryNearHigh))
         {
             return new DiagnosisInsight(
                 HasSignal: true,
-                Title: "Big download while PC was busy",
+                Title: $"Big {transfer} while PC was busy",
                 SummaryFragment: "network traffic spiked while system pressure was already elevated",
-                LikelyCause: "A download, sync or stream added to the load.",
+                LikelyCause: $"A {transfer} added to the load. {TransferCause(transfer)}",
                 Severity: EventSeverity.Warning);
         }
 
         return DiagnosisInsight.None;
     }
+
+    /// <summary>"download", "upload" or "network transfer", depending on which direction dominated.</summary>
+    internal static string DescribeTransfer(MetricSample sample)
+    {
+        double down = sample.NetworkReceiveKbps ?? 0;
+        double up = sample.NetworkSendKbps ?? 0;
+        return down >= up * 2 ? "download" : up >= down * 2 ? "upload" : "network transfer";
+    }
+
+    private static string TransferCause(string transfer) => transfer switch
+    {
+        "download" => "Often a game update, cloud sync or streaming.",
+        "upload" => "Often a cloud backup, sync or a video call.",
+        _ => "Often a cloud sync, streaming or a video call."
+    };
 
     private static string BuildTopProcessFragment(MetricSample sample)
     {

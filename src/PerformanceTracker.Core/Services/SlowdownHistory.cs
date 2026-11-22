@@ -74,42 +74,82 @@ public static partial class SlowdownHistory
         return result;
     }
 
-    public static SlowdownTotals Totals(IReadOnlyList<PerformanceEvent> events)
+    /// <summary>
+    /// Count, time and most common kind. When a window is given, only the part of each slowdown inside it counts,
+    /// so a slowdown from 11:55 p.m. to 12:05 a.m. adds 5 minutes to each day.
+    /// </summary>
+    public static SlowdownTotals Totals(IReadOnlyList<PerformanceEvent> events, DateTimeOffset? from = null, DateTimeOffset? to = null)
     {
-        TimeSpan total = events.Aggregate(TimeSpan.Zero, (sum, e) => sum + Length(e));
-        string? mostCommon = events
+        DateTimeOffset start = from ?? DateTimeOffset.MinValue;
+        DateTimeOffset end = to ?? DateTimeOffset.MaxValue;
+        PerformanceEvent[] inside = events.Where(e => e.EndedAtUtc >= start && e.StartedAtUtc <= end).ToArray();
+        TimeSpan total = inside.Aggregate(TimeSpan.Zero, (sum, e) => sum + Overlap(e, start, end));
+        string? mostCommon = inside
             .GroupBy(e => e.Summary)
             .OrderByDescending(group => group.Count())
-            .ThenByDescending(group => group.Aggregate(TimeSpan.Zero, (sum, e) => sum + Length(e)))
+            .ThenByDescending(group => group.Aggregate(TimeSpan.Zero, (sum, e) => sum + Overlap(e, start, end)))
             .Select(group => group.Key)
             .FirstOrDefault();
-        return new SlowdownTotals(events.Count, total, mostCommon);
+        return new SlowdownTotals(inside.Length, total, mostCommon);
     }
 
-    /// <summary>Minutes of slowdown that fall inside each bucket from <paramref name="start"/>, clipped to bucket edges.</summary>
-    public static double[] MinutesPerBucket(IReadOnlyList<PerformanceEvent> events, DateTimeOffset start, TimeSpan bucket, int count)
+    /// <summary>
+    /// Minutes of slowdown inside each bucket. <paramref name="boundaries"/> holds bucket edges in order
+    /// (n + 1 edges for n buckets), so callers can use local midnights and clock-change days of 23 or 25 hours.
+    /// </summary>
+    public static double[] MinutesPerBucket(IReadOnlyList<PerformanceEvent> events, IReadOnlyList<DateTimeOffset> boundaries)
     {
+        int count = Math.Max(0, boundaries.Count - 1);
         double[] minutes = new double[count];
         foreach (PerformanceEvent performanceEvent in events)
         {
             for (int i = 0; i < count; i++)
             {
-                DateTimeOffset from = start + bucket * i;
-                DateTimeOffset to = from + bucket;
-                DateTimeOffset overlapStart = performanceEvent.StartedAtUtc > from ? performanceEvent.StartedAtUtc : from;
-                DateTimeOffset overlapEnd = performanceEvent.EndedAtUtc < to ? performanceEvent.EndedAtUtc : to;
-                if (overlapEnd > overlapStart)
-                {
-                    minutes[i] += (overlapEnd - overlapStart).TotalMinutes;
-                }
+                minutes[i] += Overlap(performanceEvent, boundaries[i], boundaries[i + 1]).TotalMinutes;
             }
         }
 
         return minutes;
     }
 
-    private static TimeSpan Length(PerformanceEvent performanceEvent) =>
-        performanceEvent.EndedAtUtc > performanceEvent.StartedAtUtc ? performanceEvent.EndedAtUtc - performanceEvent.StartedAtUtc : TimeSpan.Zero;
+    /// <summary>Bucket edges for one local day, one per hour of real time (23, 24 or 25 buckets).</summary>
+    public static IReadOnlyList<DateTimeOffset> HourBoundaries(DateTime localDay, TimeZoneInfo zone)
+    {
+        DateTimeOffset start = LocalMidnight(localDay, zone);
+        DateTimeOffset end = LocalMidnight(localDay.AddDays(1), zone);
+        List<DateTimeOffset> edges = [];
+        for (DateTimeOffset edge = start; edge < end; edge = edge.AddHours(1))
+        {
+            edges.Add(edge);
+        }
+
+        edges.Add(end);
+        return edges;
+    }
+
+    /// <summary>Bucket edges at each local midnight from <paramref name="firstLocalDay"/> for <paramref name="days"/> days.</summary>
+    public static IReadOnlyList<DateTimeOffset> DayBoundaries(DateTime firstLocalDay, int days, TimeZoneInfo zone) =>
+        Enumerable.Range(0, days + 1).Select(i => LocalMidnight(firstLocalDay.AddDays(i), zone)).ToArray();
+
+    /// <summary>The instant a local calendar day begins in <paramref name="zone"/>.</summary>
+    public static DateTimeOffset LocalMidnight(DateTime localDay, TimeZoneInfo zone)
+    {
+        DateTime midnight = DateTime.SpecifyKind(localDay.Date, DateTimeKind.Unspecified);
+        // If midnight itself is skipped by a clock change, step forward to the first valid local time.
+        while (zone.IsInvalidTime(midnight))
+        {
+            midnight = midnight.AddMinutes(30);
+        }
+
+        return new DateTimeOffset(midnight, zone.GetUtcOffset(midnight));
+    }
+
+    private static TimeSpan Overlap(PerformanceEvent performanceEvent, DateTimeOffset from, DateTimeOffset to)
+    {
+        DateTimeOffset start = performanceEvent.StartedAtUtc > from ? performanceEvent.StartedAtUtc : from;
+        DateTimeOffset end = performanceEvent.EndedAtUtc < to ? performanceEvent.EndedAtUtc : to;
+        return end > start ? end - start : TimeSpan.Zero;
+    }
 
     [GeneratedRegex(@"^(.+?) jumped to ([\d.]+)% CPU")]
     private static partial Regex LegacyCpuContributor();

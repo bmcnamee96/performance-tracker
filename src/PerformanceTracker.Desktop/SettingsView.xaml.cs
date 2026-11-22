@@ -39,12 +39,13 @@ public partial class SettingsView : UserControl
         CollectorSettings c = collector.Value;
         CpuRule.Text = $"Over {c.CpuHighPercent:F0}% for {c.CpuHighDurationSeconds} seconds";
         MemoryRule.Text = $"Over {c.MemoryHighPercent:F0}% in use";
-        DiskRule.Text = $"Busy over {c.DiskActiveHighPercent:F0}% of the time";
+        DiskRule.Text = $"Busy over {c.DiskActiveHighPercent:F0}% and slow to respond";
         IntervalRule.Text = $"Every {c.SampleIntervalSeconds} seconds";
 
         RetentionSettings r = retention.Value;
         EventRetention.Text = $"Kept {Days(r.EventRetentionDays)}";
         AppRetention.Text = $"Kept {Days(r.AppMemoryRetentionDays)}";
+        SummaryRetention.Text = $"Kept {Days(r.DailySummaryRetentionDays)}";
         SampleRetention.Text = r.RawSampleRetentionHours % 24 == 0
             ? $"Kept {Days(r.RawSampleRetentionHours / 24)}"
             : $"Kept {r.RawSampleRetentionHours} hours";

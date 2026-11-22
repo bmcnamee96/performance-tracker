@@ -20,7 +20,8 @@ public sealed class WindowsPerformanceCollector(IProcessInventory inventory) : I
 
     private MemorySnapshot _lastMemorySnapshot;
 
-    private NetworkSnapshot? _networkSnapshot;
+    private Dictionary<string, (long Received, long Sent)>? _networkTotals;
+    private long _networkTimestamp;
     private double? _lastNetworkReceiveKbps;
     private double? _lastNetworkSendKbps;
 
@@ -181,9 +182,6 @@ public sealed class WindowsPerformanceCollector(IProcessInventory inventory) : I
     {
         try
         {
-            long bytesReceived = 0;
-            long bytesSent = 0;
-
             NetworkInterface[] candidates = NetworkInterface.GetAllNetworkInterfaces()
                 .Where(ShouldIncludeNetworkInterface)
                 .ToArray();
@@ -191,52 +189,54 @@ public sealed class WindowsPerformanceCollector(IProcessInventory inventory) : I
             // Virtual adapters (VMware, WSL/Hyper-V, VPNs) repeat traffic that also crosses the real adapter,
             // so count only adapters that lead to the internet. Fall back to all of them if none has a gateway.
             NetworkInterface[] internetFacing = candidates.Where(HasGateway).ToArray();
+            Dictionary<string, (long Received, long Sent)> totals = new(StringComparer.Ordinal);
             foreach (NetworkInterface networkInterface in internetFacing.Length > 0 ? internetFacing : candidates)
             {
-
                 try
                 {
                     IPv4InterfaceStatistics statistics = networkInterface.GetIPv4Statistics();
-                    bytesReceived += statistics.BytesReceived;
-                    bytesSent += statistics.BytesSent;
+                    totals[networkInterface.Id] = (statistics.BytesReceived, statistics.BytesSent);
                 }
-                catch
+                catch (Exception ex) when (ex is NetworkInformationException or PlatformNotSupportedException or InvalidOperationException)
                 {
                     // Ignore transient adapter-state failures and continue with other interfaces.
                 }
             }
 
             long timestamp = Stopwatch.GetTimestamp();
-
-            if (_networkSnapshot is null)
-            {
-                _networkSnapshot = new NetworkSnapshot(timestamp, bytesReceived, bytesSent);
-                return (_lastNetworkReceiveKbps, _lastNetworkSendKbps);
-            }
-
-            long elapsedTicks = timestamp - _networkSnapshot.Value.TimestampTicks;
-            long receivedDelta = bytesReceived - _networkSnapshot.Value.BytesReceived;
-            long sentDelta = bytesSent - _networkSnapshot.Value.BytesSent;
-
-            _networkSnapshot = new NetworkSnapshot(timestamp, bytesReceived, bytesSent);
-
-            if (elapsedTicks <= 0 || receivedDelta < 0 || sentDelta < 0)
+            Dictionary<string, (long Received, long Sent)>? previous = _networkTotals;
+            long previousTimestamp = _networkTimestamp;
+            _networkTotals = totals;
+            _networkTimestamp = timestamp;
+            if (previous is null)
             {
                 return (_lastNetworkReceiveKbps, _lastNetworkSendKbps);
             }
 
-            double elapsedSeconds = (double)elapsedTicks / Stopwatch.Frequency;
+            // Compare each adapter only with itself. An adapter that just connected (or reconnected and reset its
+            // counters) is skipped for this reading instead of adding its lifetime traffic as a fake spike.
+            long receivedDelta = 0;
+            long sentDelta = 0;
+            foreach ((string id, (long received, long sent)) in totals)
+            {
+                if (previous.TryGetValue(id, out var before) && received >= before.Received && sent >= before.Sent)
+                {
+                    receivedDelta += received - before.Received;
+                    sentDelta += sent - before.Sent;
+                }
+            }
+
+            double elapsedSeconds = (double)(timestamp - previousTimestamp) / Stopwatch.Frequency;
             if (elapsedSeconds <= 0)
             {
                 return (_lastNetworkReceiveKbps, _lastNetworkSendKbps);
             }
 
-            _lastNetworkReceiveKbps = Math.Round(((double)receivedDelta * 8d / 1024d) / elapsedSeconds, 1);
-            _lastNetworkSendKbps = Math.Round(((double)sentDelta * 8d / 1024d) / elapsedSeconds, 1);
-
+            _lastNetworkReceiveKbps = Math.Round(receivedDelta * 8d / 1024d / elapsedSeconds, 1);
+            _lastNetworkSendKbps = Math.Round(sentDelta * 8d / 1024d / elapsedSeconds, 1);
             return (_lastNetworkReceiveKbps, _lastNetworkSendKbps);
         }
-        catch
+        catch (Exception ex) when (ex is NetworkInformationException or PlatformNotSupportedException or InvalidOperationException)
         {
             return (_lastNetworkReceiveKbps, _lastNetworkSendKbps);
         }
@@ -383,7 +383,7 @@ public sealed class WindowsPerformanceCollector(IProcessInventory inventory) : I
             return networkInterface.GetIPProperties().GatewayAddresses
                 .Any(gateway => !gateway.Address.Equals(System.Net.IPAddress.Any) && !gateway.Address.Equals(System.Net.IPAddress.IPv6Any));
         }
-        catch (NetworkInformationException)
+        catch (Exception ex) when (ex is NetworkInformationException or PlatformNotSupportedException or InvalidOperationException)
         {
             return false;
         }
@@ -591,7 +591,6 @@ public sealed class WindowsPerformanceCollector(IProcessInventory inventory) : I
 
     private readonly record struct ProcessSnapshot(string? Name, double? MemoryMb);
 
-    private readonly record struct NetworkSnapshot(long TimestampTicks, long BytesReceived, long BytesSent);
 
     private readonly record struct DiskSnapshot(
         long BytesRead,
