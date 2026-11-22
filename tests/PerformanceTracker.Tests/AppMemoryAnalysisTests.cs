@@ -47,7 +47,7 @@ public sealed class AppMemoryAnalysisTests
     {
         AppMemorySample steady = Sample(0, 4000) with { Key = "other", DisplayName = "Other", CpuPercent = 60 };
         Assert.Null(AppMemoryAnalysis.DescribeContributor([steady], [steady]));
-        Assert.Equal("Example jumped to 40% CPU (up 35 percentage points). Example used 200 MB more memory.",
+        Assert.Equal("Example jumped to 40% CPU. It also grew by 200 MB.",
             AppMemoryAnalysis.DescribeContributor([steady, Sample(0, 200) with { CpuPercent = 5 }],
                 [steady, Sample(1, 400) with { CpuPercent = 40 }]));
     }

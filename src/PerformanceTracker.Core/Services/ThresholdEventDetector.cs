@@ -37,66 +37,13 @@ public sealed class ThresholdEventDetector : IEventDetector
                 StartedAtUtc = recentSamples[0].TimestampUtc,
                 EndedAtUtc = latest.TimestampUtc,
                 Severity = insight.Severity,
-                Summary = $"{insight.Title} built up over {FormatWindow(recentSamples)} while {DescribeForegroundApp(foregroundApp)} was active: {insight.SummaryFragment}.",
-                LikelyCause = BuildLikelyCause(recentSamples, latest, insight),
+                Summary = insight.Title,
+                LikelyCause = string.IsNullOrWhiteSpace(insight.LikelyCause)
+                    ? _diagnosisService.DescribeLikelyCause(latest)
+                    : insight.LikelyCause,
                 ForegroundApp = foregroundApp,
                 TriggerSample = latest
             }
         ];
-    }
-
-    private string BuildLikelyCause(
-        IReadOnlyList<MetricSample> recentSamples,
-        MetricSample latest,
-        DiagnosisAnalyzer.DiagnosisInsight insight)
-    {
-        string cause = insight.LikelyCause;
-        string? fallback = _diagnosisService.DescribeLikelyCause(latest);
-
-        if (string.IsNullOrWhiteSpace(cause) && !string.IsNullOrWhiteSpace(fallback))
-        {
-            cause = fallback;
-        }
-        else if (!string.IsNullOrWhiteSpace(fallback)
-            && !string.Equals(cause, fallback, StringComparison.OrdinalIgnoreCase)
-            && ShouldAppendFallback(cause))
-        {
-            cause = $"{cause} Latest-sample fallback: {fallback}";
-        }
-
-        if (HasSparseMetrics(recentSamples))
-        {
-            cause = $"{cause} Some optional metrics were unavailable in this window, so the diagnosis favors conservative cross-signal inference.";
-        }
-
-        return cause;
-    }
-
-    private static string DescribeForegroundApp(string? foregroundApp) =>
-        string.IsNullOrWhiteSpace(foregroundApp) ? "the system" : foregroundApp;
-
-    private static string FormatWindow(IReadOnlyList<MetricSample> recentSamples)
-    {
-        if (recentSamples.Count < 2)
-        {
-            return "the latest sample";
-        }
-
-        TimeSpan window = recentSamples[^1].TimestampUtc - recentSamples[0].TimestampUtc;
-        int roundedSeconds = Math.Max(1, (int)Math.Round(window.TotalSeconds));
-        return $"{roundedSeconds}s";
-    }
-
-    private static bool ShouldAppendFallback(string cause)
-    {
-        return cause.Length < 260 && !cause.Contains("fallback", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool HasSparseMetrics(IReadOnlyList<MetricSample> recentSamples)
-    {
-        return recentSamples.Any(sample =>
-            sample.CpuUsagePercent is null
-            || sample.DiskActiveTimePercent is null
-            || sample.NetworkReceiveKbps is null && sample.NetworkSendKbps is null);
     }
 }

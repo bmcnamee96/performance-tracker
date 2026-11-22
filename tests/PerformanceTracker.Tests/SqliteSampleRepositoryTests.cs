@@ -95,6 +95,13 @@ public sealed class SqliteSampleRepositoryTests
             await repository.SaveMetricSampleAsync(sample, CancellationToken.None);
             await repository.SavePerformanceEventAsync(performanceEvent, CancellationToken.None);
 
+            PerformanceEvent readBack = Assert.Single(repository.ReadPerformanceEvents(sample.TimestampUtc.AddMinutes(-5)));
+            Assert.Equal(performanceEvent.StartedAtUtc.ToUnixTimeSeconds(), readBack.StartedAtUtc.ToUnixTimeSeconds());
+            Assert.Equal(EventSeverity.Critical, readBack.Severity);
+            Assert.Equal("game", readBack.ForegroundApp);
+            Assert.Equal(sample.MemoryUsedPercent, readBack.TriggerSample.MemoryUsedPercent);
+            Assert.Empty(repository.ReadPerformanceEvents(sample.TimestampUtc.AddMinutes(5)));
+
             await using SqliteConnection connection = new($"Data Source={databasePath}");
             await connection.OpenAsync();
 

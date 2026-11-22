@@ -31,9 +31,8 @@ public sealed class ThresholdEventDetectorTests
 
         PerformanceEvent performanceEvent = Assert.Single(events);
         Assert.Equal(EventSeverity.Critical, performanceEvent.Severity);
-        Assert.Contains("CPU pressure", performanceEvent.Summary);
-        Assert.Contains("built up over 10s", performanceEvent.Summary);
-        Assert.Contains("CPU demand built up", performanceEvent.LikelyCause);
+        Assert.Equal("Processor maxed out", performanceEvent.Summary);
+        Assert.Equal("Something was using a lot of processing power.", performanceEvent.LikelyCause);
     }
 
     [Fact]
@@ -51,9 +50,9 @@ public sealed class ThresholdEventDetectorTests
 
         PerformanceEvent performanceEvent = Assert.Single(events);
         Assert.Equal(EventSeverity.Warning, performanceEvent.Severity);
-        Assert.Contains("Memory pressure with disk contention", performanceEvent.Summary);
-        Assert.Contains("paging", performanceEvent.LikelyCause);
-        Assert.Contains("game.exe", performanceEvent.LikelyCause);
+        Assert.Equal("Memory full, PC slowed down", performanceEvent.Summary);
+        Assert.Contains("using the disk instead", performanceEvent.LikelyCause);
+        Assert.Contains("Biggest app: game.exe (1.8 GB)", performanceEvent.LikelyCause);
     }
 
     [Fact]
@@ -71,12 +70,12 @@ public sealed class ThresholdEventDetectorTests
 
         PerformanceEvent performanceEvent = Assert.Single(events);
         Assert.Equal(EventSeverity.Warning, performanceEvent.Severity);
-        Assert.Contains("CPU pressure during network burst", performanceEvent.Summary);
-        Assert.Contains("downloads, sync, streaming, or patching", performanceEvent.LikelyCause);
+        Assert.Equal("Processor busy during a big download", performanceEvent.Summary);
+        Assert.Contains("update", performanceEvent.LikelyCause);
     }
 
     [Fact]
-    public void AppendsSparseMetricNoteWhenOptionalSignalsAreMissing()
+    public void DetectsMemoryPressureWhenOptionalSignalsAreMissing()
     {
         ThresholdEventDetector detector = new(Settings, new SimpleDiagnosisService());
         List<MetricSample> samples =
@@ -88,8 +87,8 @@ public sealed class ThresholdEventDetectorTests
         IReadOnlyList<PerformanceEvent> events = detector.Evaluate(samples, "editor");
 
         PerformanceEvent performanceEvent = Assert.Single(events);
-        Assert.Contains("RAM pressure", performanceEvent.Summary);
-        Assert.Contains("optional metrics were unavailable", performanceEvent.LikelyCause);
+        Assert.Equal("Memory almost full", performanceEvent.Summary);
+        Assert.True(performanceEvent.LikelyCause.Length < 120);
     }
 
     [Fact]
@@ -122,7 +121,7 @@ public sealed class ThresholdEventDetectorTests
             topProcessName: "scanner.exe",
             topProcessMemoryMb: 1500));
 
-        Assert.Contains("paging", cause);
+        Assert.Contains("using the disk instead", cause);
         Assert.Contains("scanner.exe", cause);
     }
 

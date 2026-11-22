@@ -1,4 +1,5 @@
 using PerformanceTracker.Core.Models;
+using PerformanceTracker.Core.Services;
 
 namespace PerformanceTracker.Desktop.Services;
 
@@ -62,9 +63,10 @@ public sealed class MonitoringState
     private void UpsertRecentEvent(PerformanceEvent performanceEvent)
     {
         int lastIndex = _recentEvents.Count - 1;
-        if (lastIndex >= 0 && IsSameEventWindow(_recentEvents[lastIndex], performanceEvent))
+        if (lastIndex >= 0 && EventMerging.TryMerge(_recentEvents[lastIndex], performanceEvent) is { } merged)
         {
-            _recentEvents[lastIndex] = performanceEvent;
+            _recentEvents[lastIndex] = merged;
+            _latestEvent = merged;
             return;
         }
 
@@ -74,12 +76,6 @@ public sealed class MonitoringState
             _recentEvents.RemoveAt(0);
         }
     }
-
-    private static bool IsSameEventWindow(PerformanceEvent left, PerformanceEvent right) =>
-        left.StartedAtUtc == right.StartedAtUtc &&
-        left.Severity == right.Severity &&
-        string.Equals(left.Summary, right.Summary, StringComparison.Ordinal) &&
-        string.Equals(left.ForegroundApp, right.ForegroundApp, StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record MonitoringSnapshot(

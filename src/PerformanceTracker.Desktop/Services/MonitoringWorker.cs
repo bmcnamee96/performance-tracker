@@ -85,7 +85,8 @@ public sealed partial class MonitoringWorker : BackgroundService
         }
         if (latestDetectedEvent is not null && contributor is not null)
         {
-            latestDetectedEvent = latestDetectedEvent with { LikelyCause = $"{contributor} {latestDetectedEvent.LikelyCause}" };
+            // A named app is more useful than the generic explanation, so it replaces it.
+            latestDetectedEvent = latestDetectedEvent with { LikelyCause = contributor };
         }
 
         if (latestDetectedEvent is not null)

@@ -184,12 +184,15 @@ public sealed class WindowsPerformanceCollector(IProcessInventory inventory) : I
             long bytesReceived = 0;
             long bytesSent = 0;
 
-            foreach (NetworkInterface networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+            NetworkInterface[] candidates = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(ShouldIncludeNetworkInterface)
+                .ToArray();
+
+            // Virtual adapters (VMware, WSL/Hyper-V, VPNs) repeat traffic that also crosses the real adapter,
+            // so count only adapters that lead to the internet. Fall back to all of them if none has a gateway.
+            NetworkInterface[] internetFacing = candidates.Where(HasGateway).ToArray();
+            foreach (NetworkInterface networkInterface in internetFacing.Length > 0 ? internetFacing : candidates)
             {
-                if (!ShouldIncludeNetworkInterface(networkInterface))
-                {
-                    continue;
-                }
 
                 try
                 {
@@ -371,6 +374,19 @@ public sealed class WindowsPerformanceCollector(IProcessInventory inventory) : I
         }
 
         return _systemVolumeHandle;
+    }
+
+    private static bool HasGateway(NetworkInterface networkInterface)
+    {
+        try
+        {
+            return networkInterface.GetIPProperties().GatewayAddresses
+                .Any(gateway => !gateway.Address.Equals(System.Net.IPAddress.Any) && !gateway.Address.Equals(System.Net.IPAddress.IPv6Any));
+        }
+        catch (NetworkInformationException)
+        {
+            return false;
+        }
     }
 
     private static bool ShouldIncludeNetworkInterface(NetworkInterface networkInterface)

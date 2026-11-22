@@ -120,6 +120,143 @@
       <Setter Property="Padding" Value="4,2" />
     </Style>
 
+    <!-- Shared card look for the Dashboard, Event Timeline and Settings tabs. -->
+    <Style x:Key="Card" TargetType="Border">
+      <Setter Property="Background" Value="#111E2C" />
+      <Setter Property="BorderBrush" Value="#24384C" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="16" />
+    </Style>
+
+    <Style x:Key="CardTitle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource ThemeTextBrush}" />
+    </Style>
+
+    <!-- Pill-shaped option button used for range pickers. -->
+    <Style x:Key="ChipRadio" TargetType="RadioButton">
+      <Setter Property="Foreground" Value="{StaticResource ThemeMutedTextBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Margin" Value="6,0,0,0" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border x:Name="Chip" Padding="12,5" CornerRadius="9" Background="#162636" BorderBrush="#24384C" BorderThickness="1">
+              <ContentPresenter />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chip" Property="Background" Value="{StaticResource ThemeHoverBrush}" />
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Chip" Property="Background" Value="#0F4C57" />
+                <Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource ThemeAccentBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource ThemeTextBrush}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- On/off switch drawn from a CheckBox. -->
+    <Style x:Key="ToggleSwitch" TargetType="CheckBox">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Foreground" Value="{StaticResource ThemeTextBrush}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <Grid Background="Transparent">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <ContentPresenter VerticalAlignment="Center" Margin="0,0,16,0" />
+              <Border x:Name="Track" Grid.Column="1" Width="40" Height="22" CornerRadius="11" Background="#24384C"
+                      BorderBrush="#2E4A63" BorderThickness="1" VerticalAlignment="Center">
+                <Ellipse x:Name="Knob" Width="16" Height="16" Margin="3,0" Fill="#8EA3B8" HorizontalAlignment="Left" />
+              </Border>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Track" Property="Background" Value="#0F4C57" />
+                <Setter TargetName="Track" Property="BorderBrush" Value="#3FD5E6" />
+                <Setter TargetName="Knob" Property="Fill" Value="#3FD5E6" />
+                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Text-only link button. -->
+    <Style x:Key="LinkButton" TargetType="Button">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Foreground" Value="#5CC8D8" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <TextBlock x:Name="Label" Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" />
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Label" Property="TextDecorations" Value="Underline" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Slim dark slider: accent fill to the left of a round thumb. -->
+    <Style x:Key="SliderFill" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+            <Grid Background="Transparent">
+              <Border Height="4" CornerRadius="2" Background="{TemplateBinding Background}" />
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="Slider">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Slider">
+            <Track x:Name="PART_Track" MinHeight="20">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Style="{StaticResource SliderFill}" Background="{StaticResource ThemeAccentBrush}" Command="Slider.DecreaseLarge" />
+              </Track.DecreaseRepeatButton>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Style="{StaticResource SliderFill}" Background="#24384C" Command="Slider.IncreaseLarge" />
+              </Track.IncreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb>
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Ellipse Width="16" Height="16" Fill="#E6EEF5" Stroke="{StaticResource ThemeAccentBrush}" StrokeThickness="2" />
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+            </Track>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
     <!-- Slim dark scrollbars. -->
     <Style x:Key="ScrollThumbStyle" TargetType="Thumb">
       <Setter Property="Template">

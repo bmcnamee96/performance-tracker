@@ -80,12 +80,14 @@ public static class AppMemoryAnalysis
         List<string> reasons = [];
         if (cpu.Sample is not null)
         {
-            reasons.Add($"{cpu.Sample.DisplayName} jumped to {cpu.Sample.CpuPercent:0.#}% CPU (up {cpu.Cpu:0.#} percentage points).");
+            reasons.Add(string.Create(CultureInfo.CurrentCulture, $"{cpu.Sample.DisplayName} jumped to {cpu.Sample.CpuPercent:0}% CPU."));
         }
 
         if (memory.Sample is not null)
         {
-            reasons.Add($"{memory.Sample.DisplayName} used {FormatMemory(memory.Memory)} more memory.");
+            reasons.Add(memory.Sample.Key == cpu.Sample?.Key
+                ? $"It also grew by {FormatMemory(memory.Memory)}."
+                : $"{memory.Sample.DisplayName} grew by {FormatMemory(memory.Memory)}.");
         }
 
         return reasons.Count == 0 ? null : string.Join(' ', reasons);

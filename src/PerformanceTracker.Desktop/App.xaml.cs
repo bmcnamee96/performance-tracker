@@ -66,11 +66,13 @@ public partial class App : System.Windows.Application
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "PerformanceTracker", "process-actions.json")));
                 services.AddSingleton<AppsView>();
+                services.AddSingleton<DashboardView>();
                 services.AddSingleton<StartupEntryReader>();
                 services.AddSingleton<StartupAppsView>();
                 services.AddSingleton<UserSettingsStore>();
                 services.AddSingleton<AlertService>();
-                services.AddSingleton<AlertSettingsView>();
+                services.AddSingleton<TimelineView>();
+                services.AddSingleton<SettingsView>();
 
                 services.AddSingleton<MonitoringState>();
                 services.AddSingleton<TrayIconService>();
