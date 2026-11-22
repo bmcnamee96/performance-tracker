@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Threading;
 using PerformanceTracker.Core.Interfaces;
 using PerformanceTracker.Core.Models;
+using PerformanceTracker.Core.Services;
 using PerformanceTracker.Desktop.Services;
 using PerformanceTracker.Infrastructure.Services;
 using Button = System.Windows.Controls.Button;
@@ -136,6 +137,12 @@ public partial class AppsView : UserControl
             .Where(g => g.Key == _alertedAppKey || showWindows || g.Safety != AppSafety.Protected || g.Targets.Any(IsPaused))
             .Where(g => g.Key == _alertedAppKey || !hideSmall || g.MemoryBytes >= SmallAppBytes || g.Targets.Any(IsPaused))
             .ToArray();
+
+        MemoryBreakdown breakdown = ProcessMemory.Breakdown(usedBytes, _latestGroups.Sum(g => g.MemoryBytes), visible.Sum(g => g.MemoryBytes));
+        MemoryBreakdownText.Text = totalBytes <= 0 ? string.Empty :
+            $"Apps listed below: {AppRowViewModel.FormatBytes(breakdown.ShownBytes)}" +
+            (breakdown.HiddenBytes > 0 ? $"  ·  Hidden by filters: {AppRowViewModel.FormatBytes(breakdown.HiddenBytes)}" : string.Empty) +
+            $"  ·  Windows itself: {AppRowViewModel.FormatBytes(breakdown.WindowsBytes)}";
 
         // Re-sorting moves rows under the mouse, so only do it occasionally and never while the pointer is on the list.
         bool resort = !AppList.IsMouseOver && !AppList.IsKeyboardFocusWithin && !_rows.Any(row => row.IsExpanded) &&

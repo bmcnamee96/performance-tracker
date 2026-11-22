@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using PerformanceTracker.Core.Models;
+using PerformanceTracker.Core.Services;
 
 namespace PerformanceTracker.Infrastructure.Services;
 
@@ -50,11 +51,12 @@ internal static class WindowsProcessSnapshot
             {
                 string image = entry.ImageBuffer == 0 ? "System" :
                     Marshal.PtrToStringUni(entry.ImageBuffer, entry.ImageLength / sizeof(char));
+                string name = Path.GetFileNameWithoutExtension(image);
                 processes.Add(new RunningProcessInfo
                 {
                     Id = (int)entry.Id,
-                    Name = Path.GetFileNameWithoutExtension(image),
-                    MemoryBytes = Math.Max(0, entry.PrivateWorkingSet),
+                    Name = name,
+                    MemoryBytes = ProcessMemory.Effective(name, entry.PrivateWorkingSet, (long)entry.WorkingSet),
                     WorkingSetBytes = (long)entry.WorkingSet,
                     PrivateCommitBytes = (long)entry.PrivatePageCount,
                     TotalCpuTime = TimeSpan.FromTicks(entry.UserTime + entry.KernelTime),

@@ -10,7 +10,7 @@ public sealed record RunningProcessInfo
     /// <summary>Executable name without extension, e.g. "chrome".</summary>
     public required string Name { get; init; }
 
-    /// <summary>Private working set in bytes.</summary>
+    /// <summary>Private working set in bytes (full working set for VM hosts; see ProcessMemory.Effective).</summary>
     public long MemoryBytes { get; init; }
 
     public long WorkingSetBytes { get; init; }

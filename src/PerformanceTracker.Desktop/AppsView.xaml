@@ -333,6 +333,11 @@
                        Foreground="#42CED9"
                        Background="#22364A"
                        BorderThickness="0" />
+          <TextBlock x:Name="MemoryBreakdownText"
+                     Margin="0,6,0,0"
+                     Foreground="#8EA3B8"
+                     TextWrapping="Wrap"
+                     ToolTip="Windows itself is memory held by the system rather than any one app: drivers, the kernel, the file cache and shared code. It isn't something you can close." />
           <TextBlock x:Name="SuggestionSummaryText"
                      Margin="0,8,0,0"
                      FontWeight="SemiBold"
