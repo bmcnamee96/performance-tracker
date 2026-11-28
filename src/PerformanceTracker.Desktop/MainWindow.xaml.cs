@@ -16,7 +16,7 @@ public partial class MainWindow : Window
 
     public MainWindow(
         MonitoringState monitoringState,
-        DashboardView dashboardView, AppsView appsView, StartupAppsView startupAppsView,
+        DashboardView dashboardView, AppsView appsView, AgentsView agentsView, StartupAppsView startupAppsView,
         TimelineView timelineView, SettingsView settingsView)
     {
         InitializeComponent();
@@ -24,6 +24,7 @@ public partial class MainWindow : Window
         dashboardView.ShowAppsRequested += (_, key) => ShowApp(key);
         dashboardView.ShowTimelineRequested += (_, _) => TimelineTab.IsSelected = true;
         AppsTab.Content = appsView;
+        AgentsTab.Content = agentsView;
         StartupTab.Content = startupAppsView;
         TimelineTab.Content = timelineView;
         SettingsTab.Content = settingsView;

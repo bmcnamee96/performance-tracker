@@ -95,6 +95,8 @@
 
       <TabItem x:Name="AppsTab" Header="Apps &amp; Memory" />
 
+      <TabItem x:Name="AgentsTab" Header="Agents" />
+
       <TabItem x:Name="StartupTab" Header="Startup Apps" />
 
       <TabItem x:Name="TimelineTab" Header="Event Timeline" />

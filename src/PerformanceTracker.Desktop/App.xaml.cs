@@ -70,6 +70,8 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<DashboardView>();
                 services.AddSingleton<StartupEntryReader>();
                 services.AddSingleton<StartupAppsView>();
+                services.AddSingleton(_ => new T3AgentReader(T3AgentReader.DefaultDatabasePath));
+                services.AddSingleton<AgentsView>();
                 services.AddSingleton<UserSettingsStore>();
                 services.AddSingleton<AlertService>();
                 services.AddSingleton<TimelineView>();
